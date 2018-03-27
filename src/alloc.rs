@@ -2,7 +2,7 @@ use std::cell::UnsafeCell;
 
 const ALIGN: usize = 0x1 << ALIGN_LOG;
 const ALIGN_LOG: usize = 4;
-const CAP: usize = 0x1 << 20;
+const CAP: usize = 0x1 << 14;
 const MAX_BYTES_PER_ALLOC: usize = MAX_CELLS_PER_ALLOC << ALIGN_LOG;
 const MAX_CELLS_PER_ALLOC: usize = 0x1 << 8;
 const NUM_CELLS: usize = CAP << ALIGN_LOG;
@@ -16,7 +16,10 @@ pub struct Allocator {
 impl Allocator {
     pub fn new() -> Self {
         Allocator {
-            buffer: UnsafeCell::new(vec![[0; ALIGN]; NUM_CELLS].into_boxed_slice()),
+            buffer: (0..NUM_CELLS)
+                .map(|_| UnsafeCell::new([0; ALIGN]))
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
             cursor: 0,
             prev_size: vec![0],
         }
@@ -34,7 +37,7 @@ impl Allocator {
         ensure_index(&mut self.prev_size, self.cursor);
         self.prev_size[self.cursor] = cells;
 
-        unsafe { (&mut (*self.buffer.get())[start..end]) as *mut [[u8; ALIGN]] as *mut () }
+        self.buffer[start].get() as *mut ()
     }
 
     pub unsafe fn deallocate(&mut self, ptr: *mut (), size: usize) {

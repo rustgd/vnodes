@@ -1,12 +1,13 @@
+use {Context, Interned};
+
 #[repr(u8)]
 pub enum Action {
     Call = 0x0,
-    Get = 0x1,
-    Set = 0x2,
-}
-
-pub struct Context {
-    pub root: NodeData,
+    List = 0x1,
+    Get = 0x10,
+    Set = 0x12,
+    Clone = 0x20,
+    Drop = 0x21,
 }
 
 bitflags! {
@@ -19,13 +20,10 @@ bitflags! {
         const SIGNED = 0x8;
         const FLOAT = 0x10;
         const BOOL = 0x20;
+        const INTERNED = 0x40;
         // --
     }
 }
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct InternedSingle(pub u64);
 
 #[repr(C)]
 pub struct NodeData {
@@ -39,10 +37,11 @@ pub struct NodeData {
     /// 4. length of 5. parameter (number of elements)
     /// 5. arguments array
     pub action:
-        unsafe extern "C" fn(*const (), *mut Context, Action, usize, *const [Value]) -> Value,
+        unsafe extern "C" fn(*const NodeData, *mut Context, Action, usize, *const Value) -> Value,
 }
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct Value {
     pub flags: Flags,
     pub value: ValueInner,
@@ -52,6 +51,7 @@ pub struct Value {
 #[derive(Copy, Clone)]
 pub union ValueInner {
     pub boolean: bool,
+    pub interned: Interned,
     pub node_data: *const NodeData,
     pub signed: i64,
     pub unsigned: u64,
