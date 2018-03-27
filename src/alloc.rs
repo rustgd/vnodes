@@ -8,10 +8,9 @@ const MAX_CELLS_PER_ALLOC: usize = 0x1 << 8;
 const NUM_CELLS: usize = CAP << ALIGN_LOG;
 
 pub struct Allocator {
-    buffer: UnsafeCell<Box<[[u8; ALIGN]]>>,
+    buffer: Box<[UnsafeCell<[u8; ALIGN]>]>,
     prev_size: Vec<usize>,
     cursor: usize,
-    last: u8,
 }
 
 impl Allocator {
@@ -19,7 +18,6 @@ impl Allocator {
         Allocator {
             buffer: UnsafeCell::new(vec![[0; ALIGN]; NUM_CELLS].into_boxed_slice()),
             cursor: 0,
-            last: 0,
             prev_size: vec![0],
         }
     }
@@ -27,27 +25,23 @@ impl Allocator {
     pub fn allocate(&mut self, bytes: usize) -> *mut () {
         let cells = aligned_cells(bytes);
         let start = self.cursor;
-        let end = start + cells as usize;
+        let end = start + cells;
 
-        println!("cells: {}", cells);
         assert!(NUM_CELLS > end, "Allocator went out of memory");
 
-        self.last = cells;
-        self.cursor += cells as usize;
+        self.cursor += cells;
 
         ensure_index(&mut self.prev_size, self.cursor);
-        self.prev_size[self.cursor] = cells as usize;
+        self.prev_size[self.cursor] = cells;
 
         unsafe { (&mut (*self.buffer.get())[start..end]) as *mut [[u8; ALIGN]] as *mut () }
     }
 
     pub unsafe fn deallocate(&mut self, ptr: *mut (), size: usize) {
-        let index = ptr as usize - (&(*self.buffer.get())[0] as *const [u8; ALIGN] as usize);
+        let index = ptr as usize - (self.buffer[0].get() as usize);
         let index = index >> ALIGN_LOG;
-        println!("index: {}", index);
         let num_cells = aligned_cells(size);
-        let end = index + num_cells as usize;
-        println!("end: {}", end);
+        let end = index + num_cells;
 
         if self.cursor == end {
             let to_dealloc = self.prev_size[self.cursor];
@@ -62,7 +56,6 @@ impl Allocator {
             // Re-normalize
             let bump_index = bump_index + end + 1;
 
-            println!("bump_index: {}", bump_index);
             self.prev_size[bump_index] += prev_size;
         }
     }
@@ -81,7 +74,7 @@ impl Allocator {
     }
 }
 
-fn aligned_cells(bytes: usize) -> u8 {
+fn aligned_cells(bytes: usize) -> usize {
     assert!(
         bytes <= MAX_BYTES_PER_ALLOC,
         "Cannot allocate that many bytes"
@@ -93,7 +86,7 @@ fn aligned_cells(bytes: usize) -> u8 {
         cells += 1;
     }
 
-    cells as u8
+    cells
 }
 
 fn conv64(b: &[u8]) -> u64 {

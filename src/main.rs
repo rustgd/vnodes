@@ -23,7 +23,7 @@ fn intern(mut s: &[u8]) -> u64 {
     let mut result = 0;
 
     while let Some(&byte) = s.get(0) {
-        result = result << 5;
+        result <<= 5;
         result |= intern_byte(byte) as u64;
         s = &s[1..];
     }
@@ -97,7 +97,6 @@ fn main() {
 
             ptr
         };
-
 
         p_a = allocate("a");
         p_b = allocate("b");

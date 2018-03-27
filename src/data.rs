@@ -5,7 +5,9 @@ pub enum Action {
     Set = 0x2,
 }
 
-pub struct Context {}
+pub struct Context {
+    pub root: NodeData,
+}
 
 bitflags! {
     #[repr(C)]
@@ -20,7 +22,7 @@ bitflags! {
         // --
 
         /// Set if the node accepts idents in interned form.
-        const INTERNED = 0x2;
+        const INTERNED = 0x40;
         /// Set if it's a pointer (not a value).
         /// Not used for nodes.
         const PTR = 0x80;
@@ -30,10 +32,6 @@ bitflags! {
         const INTERNED_NODE = Self::NODE.bits | Self::INTERNED.bits;
         // --
     }
-}
-
-pub unsafe extern "C" fn my_func() {
-    println!("Hi!");
 }
 
 #[repr(C)]
@@ -52,9 +50,7 @@ pub struct NodeData {
     /// 4. length of 5. parameter (number of bytes)
     /// 5. arguments array
     pub action:
-        unsafe extern "C" fn(*mut (), *mut Context, Action, usize, *const [u8]) -> Value,
-
-    pub _dynamic_size: [u8],
+        unsafe extern "C" fn(*const (), *mut Context, Action, usize, *const [u8]) -> Value,
 }
 
 #[repr(C)]
@@ -68,7 +64,7 @@ pub struct Value {
 pub union ValueInner {
     pub boolean: bool,
     pub boolean_ptr: *mut bool,
-    pub node_data: *mut NodeData,
+    pub node_data: *const NodeData,
     pub signed: i64,
     pub signed_ptr: *mut i64,
     pub unsigned: u64,
