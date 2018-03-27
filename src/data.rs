@@ -20,17 +20,6 @@ bitflags! {
         const FLOAT = 0x10;
         const BOOL = 0x20;
         // --
-
-        /// Set if the node accepts idents in interned form.
-        const INTERNED = 0x40;
-        /// Set if it's a pointer (not a value).
-        /// Not used for nodes.
-        const PTR = 0x80;
-
-        // -- Convenience flags
-        const UNINTERNED_NODE = Self::NODE.bits;
-        const INTERNED_NODE = Self::NODE.bits | Self::INTERNED.bits;
-        // --
     }
 }
 
@@ -47,10 +36,10 @@ pub struct NodeData {
     /// 1. self pointer
     /// 2. pointer to the `vnodes` context
     /// 3. the requested action
-    /// 4. length of 5. parameter (number of bytes)
+    /// 4. length of 5. parameter (number of elements)
     /// 5. arguments array
     pub action:
-        unsafe extern "C" fn(*const (), *mut Context, Action, usize, *const [u8]) -> Value,
+        unsafe extern "C" fn(*const (), *mut Context, Action, usize, *const [Value]) -> Value,
 }
 
 #[repr(C)]
@@ -63,10 +52,7 @@ pub struct Value {
 #[derive(Copy, Clone)]
 pub union ValueInner {
     pub boolean: bool,
-    pub boolean_ptr: *mut bool,
     pub node_data: *const NodeData,
     pub signed: i64,
-    pub signed_ptr: *mut i64,
     pub unsigned: u64,
-    pub unsigned_ptr: *mut u64,
 }
