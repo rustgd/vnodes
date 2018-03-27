@@ -32,15 +32,29 @@ bitflags! {
     }
 }
 
+pub unsafe extern "C" fn my_func() {
+    println!("Hi!");
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct InternedSingle(pub u64);
 
 #[repr(C)]
-#[derive(Copy, Clone)]
 pub struct NodeData {
+    /// A function pointer to the `action` function of this node.
+    ///
+    /// ## Parameters
+    ///
+    /// 1. self pointer
+    /// 2. pointer to the `vnodes` context
+    /// 3. the requested action
+    /// 4. length of 5. parameter (number of bytes)
+    /// 5. arguments array
     pub action:
         unsafe extern "C" fn(*mut (), *mut Context, Action, usize, *const [u8]) -> Value,
+
+    pub _dynamic_size: [u8],
 }
 
 #[repr(C)]

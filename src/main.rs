@@ -3,7 +3,11 @@
 #[macro_use]
 extern crate bitflags;
 
+mod macros;
+
 pub mod data;
+
+mod alloc;
 
 fn intern_byte(b: u8) -> u8 {
     match b {
@@ -75,10 +79,70 @@ enum Node {
 }
 
 fn main() {
-    println!("{}", intern_byte(b'e'));
-    println!("{}", intern_byte(b'z'));
-    println!("{}", intern_byte(b'0'));
-    println!("{}", intern_byte(b'9'));
+    let mut a = alloc::Allocator::new();
 
-    println!("{:b}", intern(b"hello"));
+    let p_a;
+    let p_b;
+    let p_c;
+    let p_d;
+    let p_e;
+
+    println!("-- Allocation 1 -- ");
+    unsafe {
+        a.debug();
+        let mut allocate = |ident: &str| {
+            println!("Allocating {}..", ident);
+            let ptr = a.allocate(32);
+            a.debug();
+
+            ptr
+        };
+
+
+        p_a = allocate("a");
+        p_b = allocate("b");
+        p_c = allocate("c");
+        p_d = allocate("d");
+    }
+
+    println!("-- De-allocation 1 -- ");
+    unsafe {
+        a.debug();
+        let mut deallocate = |ptr: *mut (), ident: &str| {
+            println!("De-allocating {}..", ident);
+            a.deallocate(ptr, 32);
+            a.debug();
+        };
+
+        deallocate(p_b, "b");
+        deallocate(p_d, "d");
+    }
+
+    println!("-- Allocation 2 -- ");
+    unsafe {
+        a.debug();
+        let mut allocate = |ident: &str| {
+            println!("Allocating {}..", ident);
+            let ptr = a.allocate(32);
+            a.debug();
+
+            ptr
+        };
+
+        p_e = allocate("e");
+    }
+
+    println!("-- De-allocation 1 -- ");
+    unsafe {
+        a.debug();
+        let mut deallocate = |ptr: *mut (), ident: &str| {
+            println!("De-allocating {}..", ident);
+            a.deallocate(ptr, 32);
+            a.debug();
+        };
+
+        deallocate(p_c, "c");
+        deallocate(p_e, "e");
+        deallocate(p_a, "a");
+    }
 }
