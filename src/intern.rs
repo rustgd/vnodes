@@ -2,6 +2,18 @@
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Interned(pub u64);
 
+impl<'a> From<&'a [u8]> for Interned {
+    fn from(bytes: &[u8]) -> Self {
+        Interned(intern(bytes))
+    }
+}
+
+impl<'a> From<&'a str> for Interned {
+    fn from(s: &str) -> Self {
+        Interned::from(s.as_bytes())
+    }
+}
+
 fn intern_byte(b: u8) -> u8 {
     match b {
         b'a'...b'z' => b - b'a',

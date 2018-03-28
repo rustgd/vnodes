@@ -16,6 +16,8 @@ pub use map::MapNode;
 
 mod macros;
 
+pub mod raw;
+
 mod alloc;
 mod data;
 mod high;
@@ -39,5 +41,7 @@ impl Vnodes {
         }
     }
 
-    pub fn insert(&self, ident: Interned, value: Value) {}
+    pub fn insert(&self, ident: Interned, value: Value<'static>) {
+        self.root.borrowed().insert(self, ident, value);
+    }
 }

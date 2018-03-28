@@ -35,7 +35,7 @@ bitflags! {
 }
 
 #[repr(C)]
-pub struct NodeData {
+pub struct RawNodeData {
     /// A function pointer to the `action` function of this node.
     ///
     /// ## Parameters
@@ -46,23 +46,23 @@ pub struct NodeData {
     /// 4. length of 5. parameter (number of elements)
     /// 5. arguments array
     pub action:
-        unsafe extern "C" fn(*mut NodeData, *mut Vnodes, Action, usize, *const Value) -> Value,
+        unsafe extern "C" fn(*mut RawNodeData, *mut Vnodes, Action, usize, *const RawValue) -> RawValue,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub struct Value {
+pub struct RawValue {
     pub flags: Flags,
-    pub value: ValueInner,
+    pub value: RawValueInner,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub union ValueInner {
+pub union RawValueInner {
     pub boolean: bool,
     pub float: f64,
     pub interned: Interned,
-    pub node_data: *mut NodeData,
+    pub node_data: *mut RawNodeData,
     pub signed: i64,
     pub unsigned: u64,
 }

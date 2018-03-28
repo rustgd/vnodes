@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use parking_lot::RwLock;
 
-use data::{Action, Flags, NodeData as RawNodeData, Value as RawValue, ValueInner};
+use raw::*;
 use {Interned, Vnodes};
 
 pub trait Node: Send + Sync {
@@ -102,6 +102,22 @@ where
 
             this.node.get(context, ident).into()
         }
+        Action::Set => {
+            let context = &*context;
+            assert_eq!(len, 2);
+
+            let args = args as *const [RawValue; 2];
+            let args = &*args;
+
+            let ident = args[0];
+            assert_eq!(ident.flags, Flags::INTERNED);
+            let ident = ident.value.interned;
+
+            let value = args[1];
+            let value = Value::from_raw(value);
+
+            this.node.set(context, ident, value).into()
+        }
         Action::Clone => {
             let old = this.strong.fetch_add(1, Ordering::Relaxed);
 
@@ -129,7 +145,7 @@ where
 
             ().into()
         }
-        _ => unimplemented!(),
+        Action::List => unimplemented!(),
     }
 }
 
@@ -155,6 +171,10 @@ impl NodeHandle {
         NodeHandle {
             data: NodeHandleRef::from_raw(inner),
         }
+    }
+
+    pub fn borrowed<'a>(&'a self) -> NodeHandleRef<'a> {
+        unsafe { NodeHandleRef::from_raw(self.raw()) }
     }
 
     pub fn raw(&self) -> *mut RawNodeData {
@@ -183,10 +203,27 @@ pub struct NodeHandleRef<'a> {
 }
 
 impl<'a> NodeHandleRef<'a> {
-    pub fn from_raw(inner: *mut RawNodeData) -> Self {
+    pub unsafe fn from_raw(inner: *mut RawNodeData) -> Self {
         NodeHandleRef {
             inner,
             marker: PhantomData,
+        }
+    }
+
+    pub fn insert(&self, context: &Vnodes, ident: Interned, value: Value<'static>) {
+        let ident: RawValue = Value::Interned(ident).into();
+        let raw_value: RawValue = value.into();
+        let list = [ident, raw_value];
+        let list: RawValueList = list.as_ptr();
+
+        unsafe {
+            Self::action(
+                self,
+                context as *const Vnodes as RawContextPtr,
+                Action::Set,
+                2,
+                list,
+            );
         }
     }
 
@@ -262,39 +299,39 @@ impl From<Value<'static>> for RawValue {
         match value {
             Value::Bool(boolean) => RawValue {
                 flags: Flags::BOOL,
-                value: ValueInner { boolean },
+                value: RawValueInner { boolean },
             },
             Value::Float(float) => RawValue {
                 flags: Flags::FLOAT,
-                value: ValueInner { float },
+                value: RawValueInner { float },
             },
             Value::Interned(interned) => RawValue {
                 flags: Flags::INTERNED,
-                value: ValueInner { interned },
+                value: RawValueInner { interned },
             },
             Value::Node(node) => RawValue {
                 flags: Flags::NODE | Flags::ALLOCATED,
-                value: ValueInner {
+                value: RawValueInner {
                     node_data: node.raw(),
                 },
             },
             Value::NodeRef(node) => RawValue {
                 flags: Flags::NODE,
-                value: ValueInner {
+                value: RawValueInner {
                     node_data: node.raw(),
                 },
             },
             Value::Signed(signed) => RawValue {
                 flags: Flags::INTEGER | Flags::SIGNED,
-                value: ValueInner { signed },
+                value: RawValueInner { signed },
             },
             Value::Unsigned(unsigned) => RawValue {
                 flags: Flags::INTEGER,
-                value: ValueInner { unsigned },
+                value: RawValueInner { unsigned },
             },
             Value::Void => RawValue {
                 flags: Flags::empty(),
-                value: ValueInner { unsigned: 0x0 },
+                value: RawValueInner { unsigned: 0x0 },
             },
         }
     }

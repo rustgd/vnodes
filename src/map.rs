@@ -40,7 +40,7 @@ impl<T> InternedMap<T> {
         };
 
         match index {
-            index @ 0 | index if self.keys[index - 1] != key => {
+            index if index == 0 || self.keys[index - 1] != key => {
                 self.keys.insert(index, key);
                 self.values.insert(index, value);
 

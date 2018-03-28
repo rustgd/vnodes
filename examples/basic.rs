@@ -2,6 +2,8 @@ extern crate fern;
 extern crate log;
 extern crate vnodes;
 
+use vnodes::{Interned, Value, Vnodes};
+
 fn main() {
     fern::Dispatch::new()
         .format(|out, message, record| {
@@ -17,5 +19,6 @@ fn main() {
         .apply()
         .unwrap();
 
-    let nodes = vnodes::Vnodes::new();
+    let nodes = Vnodes::new();
+    nodes.insert(Interned::from("foo"), Value::Signed(-5));
 }
