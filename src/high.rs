@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::process::abort;
 use std::ptr::{null, null_mut};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -67,7 +68,7 @@ where
 }
 
 unsafe extern "C" fn _action_node_data<T>(
-    node_data: *const RawNodeData,
+    node_data: *mut RawNodeData,
     context: *mut Vnodes,
     action: Action,
     len: usize,
@@ -76,6 +77,15 @@ unsafe extern "C" fn _action_node_data<T>(
 where
     T: Node + 'static,
 {
+    trace!(
+        "action function called with args {:x}, {:x}, {:?}, {}, {:x}",
+        node_data as usize,
+        context as usize,
+        action,
+        len,
+        args as usize,
+    );
+
     let this = node_data as *const NodeData<T>;
     let this = &*this;
 
@@ -109,12 +119,13 @@ where
                 1 => {
                     // Synchronize with other threads to make sure we have unique ownership
                     assert_eq!(this.strong.load(Ordering::Relaxed), 0);
+
+                    // Don't rely on type inference here
+                    let b: Box<NodeData<T>> = Box::from_raw(node_data as *mut NodeData<T>);
+                    drop(b);
                 }
                 _ => {}
             }
-
-            let boxed = Box::from_raw(this as *const NodeData<T> as *mut Box<NodeData<T>>);
-            drop(boxed);
 
             ().into()
         }
@@ -122,7 +133,13 @@ where
     }
 }
 
-pub struct NodeHandle(pub *const RawNodeData);
+fn drop_box<T>(b: Box<NodeData<T>>) {
+    drop(b);
+}
+
+pub struct NodeHandle {
+    data: NodeHandleRef<'static>,
+}
 
 impl NodeHandle {
     pub fn new<N>(node: N) -> Self
@@ -131,51 +148,102 @@ impl NodeHandle {
     {
         let boxed = NodeData::new(node);
 
-        NodeHandle(Box::into_raw(boxed) as *const _)
+        unsafe { NodeHandle::from_raw(Box::into_raw(boxed) as *mut RawNodeData) }
+    }
+
+    pub unsafe fn from_raw(inner: *mut RawNodeData) -> Self {
+        NodeHandle {
+            data: NodeHandleRef::from_raw(inner),
+        }
+    }
+
+    pub fn raw(&self) -> *mut RawNodeData {
+        self.data.raw()
     }
 }
 
 impl Clone for NodeHandle {
     fn clone(&self) -> Self {
-        unsafe {
-            let raw = &*self.0;
-            (raw.action)(self.0, null_mut(), Action::Clone, 0, null());
-
-            NodeHandle(self.0)
-        }
+        self.data.to_handle()
     }
 }
 
 impl Drop for NodeHandle {
     fn drop(&mut self) {
         unsafe {
-            let raw = &*self.0;
-            (raw.action)(self.0, null_mut(), Action::Drop, 0, null());
+            NodeHandleRef::drop(&mut self.data);
         }
     }
 }
 
-unsafe impl Send for NodeHandle {}
-unsafe impl Sync for NodeHandle {}
+#[derive(Copy, Clone)]
+pub struct NodeHandleRef<'a> {
+    inner: *mut RawNodeData,
+    marker: PhantomData<&'a Node>,
+}
+
+impl<'a> NodeHandleRef<'a> {
+    pub fn from_raw(inner: *mut RawNodeData) -> Self {
+        NodeHandleRef {
+            inner,
+            marker: PhantomData,
+        }
+    }
+
+    pub fn raw(&self) -> *mut RawNodeData {
+        self.inner
+    }
+
+    pub fn to_handle(&self) -> NodeHandle {
+        unsafe {
+            Self::clone(self);
+
+            NodeHandle::from_raw(self.inner)
+        }
+    }
+
+    pub unsafe fn action<'b>(
+        this: &'b Self,
+        context: *mut Vnodes,
+        action: Action,
+        len: usize,
+        args: *const RawValue,
+    ) -> Value<'b> {
+        let raw = &*this.inner;
+
+        Value::from_raw((raw.action)(this.inner, context, action, len, args))
+    }
+
+    pub unsafe fn clone(this: &Self) {
+        Self::action(this, null_mut(), Action::Clone, 0, null());
+    }
+
+    pub unsafe fn drop(this: &mut Self) {
+        Self::action(this, null_mut(), Action::Drop, 0, null());
+    }
+}
+
+unsafe impl<'a> Send for NodeHandleRef<'a> {}
+unsafe impl<'a> Sync for NodeHandleRef<'a> {}
 
 #[derive(Clone)]
 pub enum Value<'a> {
     Node(NodeHandle),
-    NodeRef(&'a NodeHandle),
+    NodeRef(NodeHandleRef<'a>),
     Signed(i64),
     Unsigned(u64),
     Void,
 }
 
 impl<'a> Value<'a> {
-    pub fn borrowed<'b>(&'b self) -> Value<'b>
+    pub unsafe fn from_raw<'b>(raw: RawValue) -> Value<'b>
     where
         'a: 'b,
     {
-        match *self {
-            Value::Node(ref node) => Value::NodeRef(node),
-            // This is just a Copy
-            ref x => x.clone(),
+        match raw.flags {
+            Flags::NODE => Value::NodeRef(NodeHandleRef::from_raw(raw.value.node_data)),
+            Flags::NODE_BOXED => Value::Node(NodeHandle::from_raw(raw.value.node_data)),
+            _ => unimplemented!()
         }
     }
 }
@@ -185,11 +253,11 @@ impl From<Value<'static>> for RawValue {
         match value {
             Value::Node(node) => RawValue {
                 flags: Flags::NODE | Flags::ALLOCATED,
-                value: ValueInner { node_data: node.0 },
+                value: ValueInner { node_data: node.raw() },
             },
             Value::NodeRef(node) => RawValue {
                 flags: Flags::NODE,
-                value: ValueInner { node_data: node.0 },
+                value: ValueInner { node_data: node.raw() },
             },
             Value::Signed(signed) => RawValue {
                 flags: Flags::INTEGER | Flags::SIGNED,

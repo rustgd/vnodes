@@ -1,6 +1,7 @@
 use {Interned, Vnodes};
 
 #[repr(u8)]
+#[derive(Debug)]
 pub enum Action {
     Call = 0x0,
     List = 0x1,
@@ -28,6 +29,7 @@ bitflags! {
 
         /// No flag means no value
         const VOID = 0x0;
+        const NODE_BOXED = Self::NODE.bits | Self::BOXED.bits;
     }
 }
 
@@ -43,7 +45,7 @@ pub struct NodeData {
     /// 4. length of 5. parameter (number of elements)
     /// 5. arguments array
     pub action:
-        unsafe extern "C" fn(*const NodeData, *mut Vnodes, Action, usize, *const Value) -> Value,
+        unsafe extern "C" fn(*mut NodeData, *mut Vnodes, Action, usize, *const Value) -> Value,
 }
 
 #[repr(C)]
@@ -58,7 +60,7 @@ pub struct Value {
 pub union ValueInner {
     pub boolean: bool,
     pub interned: Interned,
-    pub node_data: *const NodeData,
+    pub node_data: *mut NodeData,
     pub signed: i64,
     pub unsigned: u64,
 }

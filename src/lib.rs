@@ -3,10 +3,12 @@
 #[macro_use]
 extern crate bitflags;
 extern crate fxhash;
+#[macro_use]
+extern crate log;
 extern crate parking_lot;
 
 pub use alloc::Allocator;
-pub use high::{Node, NodeMut, NodeData, NodeHandle, Value};
+pub use high::{Node, NodeData, NodeHandle, NodeMut, Value};
 pub use intern::Interned;
 pub use map::Map;
 
@@ -34,4 +36,6 @@ impl Vnodes {
             root: node,
         }
     }
+
+    pub fn insert(&self, ident: Interned, value: Value) {}
 }
