@@ -18,19 +18,21 @@ bitflags! {
         const NODE = 0x1;
         const STRING = 0x2;
         const INTEGER = 0x4;
-        const FLOAT = 0x10;
-        const BOOL = 0x20;
-        const INTERNED = 0x40;
+        const FLOAT = 0x8;
+        const BOOL = 0x10;
+        const INTERNED = 0x20;
         // --
 
-        const ALLOCATED = 0x80;
-        const BOXED = 0x100;
-        const SIGNED = 0x8;
+        const SIGNED = 0x100;
+        const ALLOCATED = 0x200;
+        const BOXED = 0x400;
+        const ARRAY = 0x800;
 
         /// No flag means no value
         const VOID = 0x0;
         const NODE_BOXED = Self::NODE.bits | Self::BOXED.bits;
         const INTEGER_SIGNED = Self::INTEGER.bits | Self::SIGNED.bits;
+        const INTERNED_PATH = Self::INTERNED.bits | Self::ARRAY.bits;
     }
 }
 
@@ -53,6 +55,7 @@ pub struct RawNodeData {
 #[derive(Copy, Clone)]
 pub struct RawValue {
     pub flags: Flags,
+    pub extra: u32,
     pub value: RawValueInner,
 }
 
@@ -103,38 +106,46 @@ impl From<Value<'static>> for RawValue {
         match value {
             Value::Bool(boolean) => RawValue {
                 flags: Flags::BOOL,
+                extra: 0,
                 value: RawValueInner { boolean },
             },
             Value::Float(float) => RawValue {
                 flags: Flags::FLOAT,
+                extra: 0,
                 value: RawValueInner { float },
             },
             Value::Interned(interned) => RawValue {
                 flags: Flags::INTERNED,
+                extra: 0,
                 value: RawValueInner { interned },
             },
             Value::Node(node) => RawValue {
                 flags: Flags::NODE | Flags::ALLOCATED,
+                extra: 0,
                 value: RawValueInner {
                     node_data: node.raw(),
                 },
             },
             Value::NodeRef(node) => RawValue {
                 flags: Flags::NODE,
+                extra: 0,
                 value: RawValueInner {
                     node_data: node.raw(),
                 },
             },
             Value::Signed(signed) => RawValue {
                 flags: Flags::INTEGER | Flags::SIGNED,
+                extra: 0,
                 value: RawValueInner { signed },
             },
             Value::Unsigned(unsigned) => RawValue {
                 flags: Flags::INTEGER,
+                extra: 0,
                 value: RawValueInner { unsigned },
             },
             Value::Void => RawValue {
                 flags: Flags::empty(),
+                extra: 0,
                 value: RawValueInner { unsigned: 0x0 },
             },
         }
@@ -144,5 +155,19 @@ impl From<Value<'static>> for RawValue {
 impl From<()> for RawValue {
     fn from(_: ()) -> Self {
         Value::Void.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::mem::size_of;
+
+    #[test]
+    fn check_size() {
+        assert_eq!(size_of::<Flags>(), 4);
+        assert_eq!(size_of::<u32>(), 4);
+        assert_eq!(size_of::<RawValueInner>(), 8);
+        assert_eq!(size_of::<RawValue>(), 16);
     }
 }

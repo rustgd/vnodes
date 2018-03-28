@@ -3,8 +3,7 @@ name = "vnodes"
 version = "0.0.0"
 authors = ["torkleyy <torkleyy@gmail.com>"]
 description = """
-Dispatches systems in parallel which need read access to some resources,
-and write access to others.
+[Experimental] Virtual node system. This is a work in progress.
 """
 readme = "README.md"
 documentation = "https://docs.rs/vnodes"
@@ -15,7 +14,7 @@ license = "MIT/Apache-2.0"
 exclude = ["bors.toml", ".travis.yml"]
 
 [badges]
-travis-ci = { repository = "torkleyy/shred" }
+travis-ci = { repository = "rustgd/vnodes" }
 
 [dependencies]
 bitflags = "1"

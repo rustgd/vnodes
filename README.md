@@ -1,5 +1,9 @@
 # vnodes
 
+A node system focusing on game development.
+
+**This is a work in progress.**
+
 ## Contribution
 
 All contributions are assumed to be dual-licensed under MIT/Apache-2.
