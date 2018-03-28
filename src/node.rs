@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use parking_lot::RwLock;
 
 use raw::*;
-use {Interned, Vnodes};
+use {Interned, Value, Vnodes};
 
 pub trait Node: Send + Sync {
     fn call(&self, context: &Vnodes, args: &[Value]) -> Value;
@@ -262,83 +262,3 @@ impl<'a> NodeHandleRef<'a> {
 
 unsafe impl<'a> Send for NodeHandleRef<'a> {}
 unsafe impl<'a> Sync for NodeHandleRef<'a> {}
-
-#[derive(Clone)]
-pub enum Value<'a> {
-    Bool(bool),
-    Float(f64),
-    Interned(Interned),
-    Node(NodeHandle),
-    NodeRef(NodeHandleRef<'a>),
-    Signed(i64),
-    Unsigned(u64),
-    Void,
-}
-
-impl<'a> Value<'a> {
-    pub unsafe fn from_raw<'b>(raw: RawValue) -> Value<'b>
-    where
-        'a: 'b,
-    {
-        match raw.flags {
-            Flags::INTEGER => Value::Unsigned(raw.value.unsigned),
-            Flags::INTEGER_SIGNED => Value::Unsigned(raw.value.unsigned),
-            Flags::BOOL => Value::Bool(raw.value.boolean),
-            Flags::FLOAT => Value::Float(raw.value.float),
-            Flags::INTERNED => Value::Interned(raw.value.interned),
-            Flags::NODE => Value::NodeRef(NodeHandleRef::from_raw(raw.value.node_data)),
-            Flags::NODE_BOXED => Value::Node(NodeHandle::from_raw(raw.value.node_data)),
-            Flags::VOID => Value::Void,
-            flags => unimplemented!("Unimplemented flags: {:?}", flags),
-        }
-    }
-}
-
-impl From<Value<'static>> for RawValue {
-    fn from(value: Value) -> Self {
-        match value {
-            Value::Bool(boolean) => RawValue {
-                flags: Flags::BOOL,
-                value: RawValueInner { boolean },
-            },
-            Value::Float(float) => RawValue {
-                flags: Flags::FLOAT,
-                value: RawValueInner { float },
-            },
-            Value::Interned(interned) => RawValue {
-                flags: Flags::INTERNED,
-                value: RawValueInner { interned },
-            },
-            Value::Node(node) => RawValue {
-                flags: Flags::NODE | Flags::ALLOCATED,
-                value: RawValueInner {
-                    node_data: node.raw(),
-                },
-            },
-            Value::NodeRef(node) => RawValue {
-                flags: Flags::NODE,
-                value: RawValueInner {
-                    node_data: node.raw(),
-                },
-            },
-            Value::Signed(signed) => RawValue {
-                flags: Flags::INTEGER | Flags::SIGNED,
-                value: RawValueInner { signed },
-            },
-            Value::Unsigned(unsigned) => RawValue {
-                flags: Flags::INTEGER,
-                value: RawValueInner { unsigned },
-            },
-            Value::Void => RawValue {
-                flags: Flags::empty(),
-                value: RawValueInner { unsigned: 0x0 },
-            },
-        }
-    }
-}
-
-impl From<()> for RawValue {
-    fn from(_: ()) -> Self {
-        Value::Void.into()
-    }
-}

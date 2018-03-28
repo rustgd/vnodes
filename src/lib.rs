@@ -10,9 +10,10 @@ extern crate log;
 extern crate parking_lot;
 
 pub use alloc::Allocator;
-pub use high::{Node, NodeData, NodeHandle, NodeMut, Value};
+pub use data::Value;
 pub use intern::Interned;
 pub use map::MapNode;
+pub use node::{Node, NodeData, NodeHandle, NodeHandleRef, NodeMut};
 
 mod macros;
 
@@ -20,9 +21,9 @@ pub mod raw;
 
 mod alloc;
 mod data;
-mod high;
 mod intern;
 mod map;
+mod node;
 
 pub struct Vnodes {
     allocator: Allocator,
