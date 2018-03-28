@@ -42,7 +42,11 @@ impl Vnodes {
         }
     }
 
+    pub fn get(&self, ident: Interned) -> Value {
+        self.root.get(self, ident)
+    }
+
     pub fn insert(&self, ident: Interned, value: Value<'static>) {
-        self.root.borrowed().insert(self, ident, value);
+        self.root.insert(self, ident, value);
     }
 }

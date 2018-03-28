@@ -67,7 +67,7 @@ pub union RawValueInner {
     pub unsigned: u64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value<'a> {
     Bool(bool),
     Float(f64),
@@ -86,7 +86,7 @@ impl<'a> Value<'a> {
     {
         match raw.flags {
             Flags::INTEGER => Value::Unsigned(raw.value.unsigned),
-            Flags::INTEGER_SIGNED => Value::Unsigned(raw.value.unsigned),
+            Flags::INTEGER_SIGNED => Value::Signed(raw.value.signed),
             Flags::BOOL => Value::Bool(raw.value.boolean),
             Flags::FLOAT => Value::Float(raw.value.float),
             Flags::INTERNED => Value::Interned(raw.value.interned),

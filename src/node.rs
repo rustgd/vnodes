@@ -153,6 +153,7 @@ fn drop_box<T>(b: Box<NodeData<T>>) {
     drop(b);
 }
 
+#[derive(Debug, PartialEq)]
 pub struct NodeHandle {
     data: NodeHandleRef<'static>,
 }
@@ -173,8 +174,12 @@ impl NodeHandle {
         }
     }
 
-    pub fn borrowed<'a>(&'a self) -> NodeHandleRef<'a> {
-        unsafe { NodeHandleRef::from_raw(self.raw()) }
+    pub fn get(&self, context: &Vnodes, ident: Interned) -> Value {
+        self.data.get(context, ident)
+    }
+
+    pub fn insert(&self, context: &Vnodes, ident: Interned, value: Value<'static>) {
+        self.data.insert(context, ident, value);
     }
 
     pub fn raw(&self) -> *mut RawNodeData {
@@ -196,7 +201,7 @@ impl Drop for NodeHandle {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct NodeHandleRef<'a> {
     inner: *mut RawNodeData,
     marker: PhantomData<&'a Node>,
@@ -207,6 +212,20 @@ impl<'a> NodeHandleRef<'a> {
         NodeHandleRef {
             inner,
             marker: PhantomData,
+        }
+    }
+
+    pub fn get<'b>(&'b self, context: &Vnodes, ident: Interned) -> Value<'b> {
+        let ident: RawValue = Value::Interned(ident).into();
+
+        unsafe {
+            Self::action(
+                self,
+                context as *const Vnodes as RawContextPtr,
+                Action::Get,
+                1,
+                &ident as RawValueList,
+            )
         }
     }
 

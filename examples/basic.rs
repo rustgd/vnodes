@@ -21,4 +21,6 @@ fn main() {
 
     let nodes = Vnodes::new();
     nodes.insert(Interned::from("foo"), Value::Signed(-5));
+
+    assert_eq!(nodes.get(Interned::from("foo")), Value::Signed(-5));
 }
