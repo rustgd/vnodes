@@ -3,10 +3,12 @@
 #[macro_use]
 extern crate bitflags;
 extern crate fxhash;
+extern crate parking_lot;
 
 pub use alloc::Allocator;
-pub use high::{Node, NodeData, NodeHandle, Value};
+pub use high::{Node, NodeMut, NodeData, NodeHandle, Value};
 pub use intern::Interned;
+pub use map::Map;
 
 mod macros;
 
@@ -24,6 +26,12 @@ pub struct Vnodes {
 
 impl Vnodes {
     pub fn new() -> Self {
-        unimplemented!()
+        let node = Map::new_node();
+
+        Vnodes {
+            allocator: Allocator::new(),
+            current: node.clone(),
+            root: node,
+        }
     }
 }

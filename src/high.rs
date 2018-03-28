@@ -2,13 +2,42 @@ use std::process::abort;
 use std::ptr::{null, null_mut};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use parking_lot::RwLock;
+
 use data::{Action, Flags, NodeData as RawNodeData, Value as RawValue, ValueInner};
 use {Interned, Vnodes};
 
-pub trait Node {
+pub trait Node: Send + Sync {
     fn call(&self, context: &Vnodes, args: &[Value]) -> Value;
 
     fn get(&self, context: &Vnodes, ident: Interned) -> Value;
+
+    fn set(&self, context: &Vnodes, ident: Interned, value: Value<'static>);
+}
+
+pub trait NodeMut: Send + Sync {
+    fn call(&self, context: &Vnodes, args: &[Value]) -> Value<'static>;
+
+    fn get(&self, context: &Vnodes, ident: Interned) -> Value<'static>;
+
+    fn set(&mut self, context: &Vnodes, ident: Interned, value: Value<'static>);
+}
+
+impl<T> Node for RwLock<T>
+where
+    T: NodeMut,
+{
+    fn call(&self, context: &Vnodes, args: &[Value]) -> Value {
+        self.read().call(context, args)
+    }
+
+    fn get(&self, context: &Vnodes, ident: Interned) -> Value {
+        self.read().get(context, ident)
+    }
+
+    fn set(&self, context: &Vnodes, ident: Interned, value: Value<'static>) {
+        self.write().set(context, ident, value)
+    }
 }
 
 #[repr(C)]
@@ -129,18 +158,36 @@ impl Drop for NodeHandle {
 unsafe impl Send for NodeHandle {}
 unsafe impl Sync for NodeHandle {}
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub enum Value<'a> {
-    Node(&'a NodeHandle),
+    Node(NodeHandle),
+    NodeRef(&'a NodeHandle),
     Signed(i64),
     Unsigned(u64),
     Void,
+}
+
+impl<'a> Value<'a> {
+    pub fn borrowed<'b>(&'b self) -> Value<'b>
+    where
+        'a: 'b,
+    {
+        match *self {
+            Value::Node(ref node) => Value::NodeRef(node),
+            // This is just a Copy
+            ref x => x.clone(),
+        }
+    }
 }
 
 impl From<Value<'static>> for RawValue {
     fn from(value: Value) -> Self {
         match value {
             Value::Node(node) => RawValue {
+                flags: Flags::NODE | Flags::ALLOCATED,
+                value: ValueInner { node_data: node.0 },
+            },
+            Value::NodeRef(node) => RawValue {
                 flags: Flags::NODE,
                 value: ValueInner { node_data: node.0 },
             },

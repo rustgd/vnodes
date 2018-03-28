@@ -1,19 +1,45 @@
-use {Interned, Node, Value, Vnodes};
+use parking_lot::RwLock;
 
-struct Map {
+use {Interned, NodeHandle, NodeMut, Value, Vnodes};
+
+#[derive(Default)]
+pub struct Map {
     idents: Vec<u64>,
     values: Vec<Value<'static>>,
 }
 
-impl Node for Map {
-    fn call(&self, context: &Vnodes, args: &[Value]) -> Value {
+impl Map {
+    pub fn new_node() -> NodeHandle {
+        NodeHandle::new(RwLock::new(Map::default()))
+    }
+}
+
+impl NodeMut for Map {
+    fn call(&self, _: &Vnodes, _: &[Value]) -> Value<'static> {
         unimplemented!()
     }
 
-    fn get(&self, context: &Vnodes, ident: Interned) -> Value {
+    fn get(&self, _: &Vnodes, ident: Interned) -> Value<'static> {
         let index = search(ident.0, &self.idents).unwrap();
 
-        self.values[index]
+        self.values[index].clone()
+    }
+
+    fn set(&mut self, _: &Vnodes, ident: Interned, value: Value<'static>) {
+        let key = ident.0;
+
+        let index = {
+            let len = self.idents.len();
+            let idents = &self.idents;
+
+            (0..len)
+                .map(|i| idents[i])
+                .position(|x| key < x)
+                .unwrap_or(len)
+        };
+
+        self.idents.insert(index, key);
+        self.values.insert(index, value);
     }
 }
 

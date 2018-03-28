@@ -23,6 +23,9 @@ bitflags! {
         const INTERNED = 0x40;
         // --
 
+        const ALLOCATED = 0x80;
+        const BOXED = 0x100;
+
         /// No flag means no value
         const VOID = 0x0;
     }
