@@ -4,13 +4,17 @@
 extern crate bitflags;
 #[macro_use]
 extern crate derivative;
+#[macro_use]
+extern crate failure;
 extern crate fxhash;
 #[macro_use]
 extern crate log;
 extern crate parking_lot;
 
 pub use alloc::Allocator;
+pub use conv::ValueConv;
 pub use data::Value;
+pub use error::{Error, Result};
 pub use intern::Interned;
 pub use map::MapNode;
 pub use node::{Node, NodeData, NodeHandle, NodeHandleRef, NodeMut};
@@ -20,7 +24,9 @@ mod macros;
 pub mod raw;
 
 mod alloc;
+mod conv;
 mod data;
+mod error;
 mod intern;
 mod map;
 mod node;
@@ -42,11 +48,19 @@ impl Vnodes {
         }
     }
 
-    pub fn get(&self, ident: Interned) -> Value {
-        self.root.get(self, ident)
+    pub fn get<'a, I, R>(&'a self, ident: I) -> Result<R>
+    where
+        I: Into<Interned>,
+        R: ValueConv<'a>,
+    {
+        R::from_value(self.root.get(self, ident.into()))
     }
 
-    pub fn insert(&self, ident: Interned, value: Value<'static>) {
-        self.root.insert(self, ident, value);
+    pub fn insert<I, V>(&self, ident: I, value: V)
+    where
+        I: Into<Interned>,
+        V: ValueConv<'static>,
+    {
+        self.root.insert(self, ident.into(), value.into_value());
     }
 }

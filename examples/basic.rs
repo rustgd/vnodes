@@ -2,7 +2,7 @@ extern crate fern;
 extern crate log;
 extern crate vnodes;
 
-use vnodes::{Interned, Value, Vnodes};
+use vnodes::Vnodes;
 
 fn main() {
     fern::Dispatch::new()
@@ -20,7 +20,7 @@ fn main() {
         .unwrap();
 
     let nodes = Vnodes::new();
-    nodes.insert(Interned::from("foo"), Value::Signed(-5));
+    nodes.insert("foo", -5i64);
 
-    assert_eq!(nodes.get(Interned::from("foo")), Value::Signed(-5));
+    assert_eq!(nodes.get("foo"), Ok(-5i64));
 }
