@@ -18,7 +18,6 @@ bitflags! {
         const NODE = 0x1;
         const STRING = 0x2;
         const INTEGER = 0x4;
-        const SIGNED = 0x8;
         const FLOAT = 0x10;
         const BOOL = 0x20;
         const INTERNED = 0x40;
@@ -26,10 +25,12 @@ bitflags! {
 
         const ALLOCATED = 0x80;
         const BOXED = 0x100;
+        const SIGNED = 0x8;
 
         /// No flag means no value
         const VOID = 0x0;
         const NODE_BOXED = Self::NODE.bits | Self::BOXED.bits;
+        const INTEGER_SIGNED = Self::INTEGER.bits | Self::SIGNED.bits;
     }
 }
 
@@ -59,6 +60,7 @@ pub struct Value {
 #[derive(Copy, Clone)]
 pub union ValueInner {
     pub boolean: bool,
+    pub float: f64,
     pub interned: Interned,
     pub node_data: *mut NodeData,
     pub signed: i64,

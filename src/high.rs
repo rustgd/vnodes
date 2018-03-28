@@ -228,6 +228,9 @@ unsafe impl<'a> Sync for NodeHandleRef<'a> {}
 
 #[derive(Clone)]
 pub enum Value<'a> {
+    Bool(bool),
+    Float(f64),
+    Interned(Interned),
     Node(NodeHandle),
     NodeRef(NodeHandleRef<'a>),
     Signed(i64),
@@ -241,9 +244,15 @@ impl<'a> Value<'a> {
         'a: 'b,
     {
         match raw.flags {
+            Flags::INTEGER => Value::Unsigned(raw.value.unsigned),
+            Flags::INTEGER_SIGNED => Value::Unsigned(raw.value.unsigned),
+            Flags::BOOL => Value::Bool(raw.value.boolean),
+            Flags::FLOAT => Value::Float(raw.value.float),
+            Flags::INTERNED => Value::Interned(raw.value.interned),
             Flags::NODE => Value::NodeRef(NodeHandleRef::from_raw(raw.value.node_data)),
             Flags::NODE_BOXED => Value::Node(NodeHandle::from_raw(raw.value.node_data)),
-            _ => unimplemented!()
+            Flags::VOID => Value::Void,
+            flags => unimplemented!("Unimplemented flags: {:?}", flags),
         }
     }
 }
@@ -251,13 +260,29 @@ impl<'a> Value<'a> {
 impl From<Value<'static>> for RawValue {
     fn from(value: Value) -> Self {
         match value {
+            Value::Bool(boolean) => RawValue {
+                flags: Flags::BOOL,
+                value: ValueInner { boolean },
+            },
+            Value::Float(float) => RawValue {
+                flags: Flags::FLOAT,
+                value: ValueInner { float },
+            },
+            Value::Interned(interned) => RawValue {
+                flags: Flags::INTERNED,
+                value: ValueInner { interned },
+            },
             Value::Node(node) => RawValue {
                 flags: Flags::NODE | Flags::ALLOCATED,
-                value: ValueInner { node_data: node.raw() },
+                value: ValueInner {
+                    node_data: node.raw(),
+                },
             },
             Value::NodeRef(node) => RawValue {
                 flags: Flags::NODE,
-                value: ValueInner { node_data: node.raw() },
+                value: ValueInner {
+                    node_data: node.raw(),
+                },
             },
             Value::Signed(signed) => RawValue {
                 flags: Flags::INTEGER | Flags::SIGNED,
