@@ -16,18 +16,14 @@ mod high;
 mod intern;
 mod map;
 
-pub struct Context {
+pub struct Vnodes {
     allocator: Allocator,
     current: NodeHandle,
     root: NodeHandle,
 }
 
-impl Context {
+impl Vnodes {
     pub fn new() -> Self {
-        Context {
-            allocator: Allocator::new(),
-            current: (),
-            root: (),
-        }
+        unimplemented!()
     }
 }

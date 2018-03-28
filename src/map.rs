@@ -1,4 +1,4 @@
-use {Context, Interned, Node, Value};
+use {Interned, Node, Value, Vnodes};
 
 struct Map {
     idents: Vec<u64>,
@@ -6,12 +6,14 @@ struct Map {
 }
 
 impl Node for Map {
-    fn call(&self, context: &Context, args: &[Value]) -> Value {
+    fn call(&self, context: &Vnodes, args: &[Value]) -> Value {
         unimplemented!()
     }
 
-    fn get(&self, context: &Context, ident: Interned) -> Value {
-        unimplemented!()
+    fn get(&self, context: &Vnodes, ident: Interned) -> Value {
+        let index = search(ident.0, &self.idents).unwrap();
+
+        self.values[index]
     }
 }
 

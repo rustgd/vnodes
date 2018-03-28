@@ -1,4 +1,4 @@
-use {Context, Interned};
+use {Interned, Vnodes};
 
 #[repr(u8)]
 pub enum Action {
@@ -22,6 +22,9 @@ bitflags! {
         const BOOL = 0x20;
         const INTERNED = 0x40;
         // --
+
+        /// No flag means no value
+        const VOID = 0x0;
     }
 }
 
@@ -37,7 +40,7 @@ pub struct NodeData {
     /// 4. length of 5. parameter (number of elements)
     /// 5. arguments array
     pub action:
-        unsafe extern "C" fn(*const NodeData, *mut Context, Action, usize, *const Value) -> Value,
+        unsafe extern "C" fn(*const NodeData, *mut Vnodes, Action, usize, *const Value) -> Value,
 }
 
 #[repr(C)]
