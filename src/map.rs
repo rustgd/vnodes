@@ -3,18 +3,18 @@ use parking_lot::RwLock;
 use {Interned, NodeHandle, NodeMut, Value, Vnodes};
 
 #[derive(Default)]
-pub struct Map {
+pub struct MapNode {
     idents: Vec<u64>,
     values: Vec<Value<'static>>,
 }
 
-impl Map {
+impl MapNode {
     pub fn new_node() -> NodeHandle {
-        NodeHandle::new(RwLock::new(Map::default()))
+        NodeHandle::new(RwLock::new(MapNode::default()))
     }
 }
 
-impl NodeMut for Map {
+impl NodeMut for MapNode {
     fn call(&self, _: &Vnodes, _: &[Value]) -> Value<'static> {
         unimplemented!()
     }

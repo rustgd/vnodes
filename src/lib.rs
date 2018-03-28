@@ -10,7 +10,7 @@ extern crate parking_lot;
 pub use alloc::Allocator;
 pub use high::{Node, NodeData, NodeHandle, NodeMut, Value};
 pub use intern::Interned;
-pub use map::Map;
+pub use map::MapNode;
 
 mod macros;
 
@@ -28,7 +28,7 @@ pub struct Vnodes {
 
 impl Vnodes {
     pub fn new() -> Self {
-        let node = Map::new_node();
+        let node = MapNode::new_node();
 
         Vnodes {
             allocator: Allocator::new(),
