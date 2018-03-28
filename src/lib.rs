@@ -2,6 +2,8 @@
 
 #[macro_use]
 extern crate bitflags;
+#[macro_use]
+extern crate derivative;
 extern crate fxhash;
 #[macro_use]
 extern crate log;

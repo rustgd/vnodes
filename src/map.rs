@@ -1,11 +1,68 @@
+use std::mem::swap;
+
 use parking_lot::RwLock;
 
 use {Interned, NodeHandle, NodeMut, Value, Vnodes};
 
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
+pub struct InternedMap<T> {
+    keys: Vec<u64>,
+    values: Vec<T>,
+}
+
+impl<T> InternedMap<T> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn get(&self, key: Interned) -> Option<&T> {
+        search(key.0, &self.keys).map(|i| &self.values[i])
+    }
+
+    pub fn get_mut(&mut self, key: Interned) -> Option<&mut T> {
+        let values = &mut self.values;
+
+        search(key.0, &self.keys).map(move |i| &mut values[i])
+    }
+
+    pub fn insert(&mut self, key: Interned, mut value: T) -> Option<T> {
+        let key = key.0;
+
+        let index = {
+            let len = self.keys.len();
+            let keys = &self.keys;
+
+            (0..len)
+                .map(|i| keys[i])
+                .position(|x| key < x)
+                .unwrap_or(len)
+        };
+
+        match index {
+            index @ 0 | index if self.keys[index - 1] != key => {
+                self.keys.insert(index, key);
+                self.values.insert(index, value);
+
+                None
+            }
+            replace_index => {
+                let index = replace_index - 1;
+
+                {
+                    let old = &mut self.values[index];
+                    swap(old, &mut value);
+                }
+
+                Some(value)
+            }
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct MapNode {
-    idents: Vec<u64>,
-    values: Vec<Value<'static>>,
+    map: InternedMap<Value<'static>>,
 }
 
 impl MapNode {
@@ -20,26 +77,11 @@ impl NodeMut for MapNode {
     }
 
     fn get(&self, _: &Vnodes, ident: Interned) -> Value<'static> {
-        let index = search(ident.0, &self.idents).unwrap();
-
-        self.values[index].clone()
+        self.map.get(ident).cloned().unwrap()
     }
 
     fn set(&mut self, _: &Vnodes, ident: Interned, value: Value<'static>) {
-        let key = ident.0;
-
-        let index = {
-            let len = self.idents.len();
-            let idents = &self.idents;
-
-            (0..len)
-                .map(|i| idents[i])
-                .position(|x| key < x)
-                .unwrap_or(len)
-        };
-
-        self.idents.insert(index, key);
-        self.values.insert(index, value);
+        self.map.insert(ident, value);
     }
 }
 

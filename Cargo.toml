@@ -19,6 +19,7 @@ travis-ci = { repository = "torkleyy/shred" }
 
 [dependencies]
 bitflags = "1"
+derivative = "1.0.0"
 fxhash = "0.2.1"
 log = "0.4.1"
 parking_lot = "0.5.4"
