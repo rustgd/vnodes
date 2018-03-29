@@ -22,5 +22,5 @@ fn main() {
     let nodes = Vnodes::new();
     nodes.insert("foo", -5i64);
 
-    assert_eq!(nodes.get("foo"), Ok(-5i64));
+    assert_eq!(nodes.get("/foo"), Ok(-5i64));
 }

@@ -184,6 +184,10 @@ impl NodeHandle {
     pub fn raw(&self) -> *mut RawNodeData {
         self.data.raw()
     }
+
+    pub fn handle_ref<'a>(&'a self) -> NodeHandleRef<'a> {
+        unsafe { NodeHandleRef::from_raw(self.raw()) }
+    }
 }
 
 impl Clone for NodeHandle {

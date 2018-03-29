@@ -1,4 +1,4 @@
-#[repr(C, packed)]
+#[repr(C)]
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Interned(pub u64);
 
