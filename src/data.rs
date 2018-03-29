@@ -122,14 +122,12 @@ impl<'a> Value<'a> {
             Flags::INTEGER => Value::Unsigned(raw.value.unsigned),
             Flags::INTEGER_SIGNED => Value::Signed(raw.value.signed),
             Flags::INTERNED => Value::Interned(raw.value.interned),
-            Flags::INTERNED_PATH => Value::InternedPathRef(from_raw_parts(
-                raw.value.interned_path as *const u64,
-                raw.extra as usize,
-            )),
+            Flags::INTERNED_PATH => {
+                Value::InternedPathRef(from_raw_parts(raw.value.interned_path, raw.extra as usize))
+            }
             Flags::INTERNED_PATH_BUF => {
-                let slice =
-                    from_raw_parts(raw.value.interned_path as *const u64, raw.extra as usize);
-                let boxed = Box::from_raw(slice as *const [u64] as *mut [u64]);
+                let slice = from_raw_parts(raw.value.interned_path, raw.extra as usize);
+                let boxed = Box::from_raw(slice as *const [Interned] as *mut [Interned]);
 
                 Value::InternedPathBuf(InternedPathBuf::from(boxed))
             }
@@ -221,7 +219,7 @@ impl<'a> From<Value<'a>> for RawValue {
                 }
             }
             Value::InternedPathRef(r) => {
-                let ptr = r.as_ptr() as *const Interned;
+                let ptr = r.as_ptr();
                 RawValue {
                     flags: Flags::INTERNED_PATH,
                     extra: r.len() as u32,

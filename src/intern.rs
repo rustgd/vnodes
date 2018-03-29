@@ -6,6 +6,16 @@ impl Interned {
     pub fn into_inner(self) -> u64 {
         self.0
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+}
+
+impl<'a> From<&'a Interned> for Interned {
+    fn from(x: &'a Interned) -> Self {
+        *x
+    }
 }
 
 impl From<u64> for Interned {
@@ -61,14 +71,14 @@ fn intern(mut s: &[u8]) -> u64 {
 // it would be nice to have a borrowed version, however
 // * DSTs can't be handled very well
 // * for this slice we cannot have an impl block
-pub type InternedPath = [u64];
+pub type InternedPath = [Interned];
 
 #[repr(C)]
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct InternedPathBuf(Vec<u64>);
+pub struct InternedPathBuf(Vec<Interned>);
 
-impl From<Box<[u64]>> for InternedPathBuf {
-    fn from(slice: Box<[u64]>) -> Self {
+impl From<Box<[Interned]>> for InternedPathBuf {
+    fn from(slice: Box<[Interned]>) -> Self {
         InternedPathBuf(slice.into_vec())
     }
 }
@@ -97,7 +107,6 @@ impl InternedPathBuf {
         InternedPathBuf(
             iter.into_iter()
                 .map(Into::into)
-                .map(Interned::into_inner)
                 .collect(),
         )
     }
@@ -106,8 +115,12 @@ impl InternedPathBuf {
         Self::from(s)
     }
 
-    pub fn into_boxed_slice(self) -> Box<[u64]> {
+    pub fn into_boxed_slice(self) -> Box<[Interned]> {
         self.0.into_boxed_slice()
+    }
+
+    pub fn is_absolute(&self) -> bool {
+        self.0.get(0).map(Interned::is_empty).unwrap_or(false)
     }
 
     pub fn path(&self) -> &InternedPath {
@@ -123,5 +136,19 @@ mod tests {
     #[test]
     fn check_no_pad() {
         assert_eq!(size_of::<Interned>(), size_of::<u64>());
+    }
+
+    #[test]
+    fn simple_path() {
+        let path = InternedPathBuf::from("very/simple/path");
+        assert_eq!(path.path()[0], Interned::from("very"));
+        assert_eq!(path.path()[1], Interned::from("simple"));
+        assert_eq!(path.path()[2], Interned::from("path"));
+    }
+
+    #[test]
+    fn absolute() {
+        let path = InternedPathBuf::from("/this/is/an/absolute/path");
+        assert!(path.is_absolute());
     }
 }
