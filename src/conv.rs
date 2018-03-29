@@ -94,8 +94,8 @@ impl_value_conv!(NodeHandle, Node);
 impl_value_conv!(NodeHandleRef, NodeRef ('a));
 
 fn conv_opt<'a, T>(raw: Option<&RawValue>) -> Result<T>
-    where
-        T: ValueConv<'a>,
+where
+    T: ValueConv<'a>,
 {
     raw.ok_or(Error::InvalidArgumentTypes)
         .and_then(|raw| unsafe { Value::from_raw(*raw).into_res() })
@@ -104,8 +104,8 @@ fn conv_opt<'a, T>(raw: Option<&RawValue>) -> Result<T>
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Debug;
     use super::*;
+    use std::fmt::Debug;
 
     /// Convert `T` -> `Value` -> `RawValue` -> `Value` -> `T` and check for equality.
     fn check_equal<T>(start: T)
@@ -129,5 +129,16 @@ mod tests {
         check_equal(true);
         check_equal(false);
         check_equal(Interned::from("my_ident"));
+    }
+
+    #[test]
+    fn check_tuples() {
+        check_equal((5u64, 19i64));
+        check_equal((5u64, true, -91.0f64));
+        check_equal((
+            5u64,
+            (Interned::from("nested"), Interned::from("tuples")),
+            -91.0f64,
+        ));
     }
 }
