@@ -32,38 +32,41 @@ impl<'a> ValueConv<'a> for Value<'a> {
     }
 }
 
-impl<'a, A, B> ValueConv<'a> for (A, B)
-where
-    A: ValueConv<'a>,
-    B: ValueConv<'a>,
-{
-    fn from_value(value: Value<'a>) -> Result<Self> {
-        fn conv<'a, T>(raw: Option<&RawValue>) -> Result<T>
+macro_rules! impl_conv_tuple {
+    ($($tys:ident . $field:tt)*) => {
+        impl<'a, $($tys,)*> ValueConv<'a> for ($($tys,)*)
         where
-            T: ValueConv<'a>,
+            $($tys : ValueConv<'a>,)*
         {
-            raw.ok_or(Error::InvalidArgumentTypes)
-                .and_then(|raw| unsafe { Value::from_raw(*raw).into_res() })
-                .and_then(|val| T::from_value(val))
+            fn from_value(value: Value<'a>) -> Result<Self> {
+                match value {
+                    Value::ValueArrayRef(raw) =>
+                        Ok(($(conv_opt(raw.get($field))?,)*)),
+                    Value::ValueArray(ref raw) =>
+                        Ok(($(conv_opt(raw.get($field))?,)*)),
+                    _ => Err(Error::WrongType),
+                }
+            }
+
+            fn into_value(self) -> Value<'a> {
+                // TODO: allow without boxing?
+
+                $(
+                    #[allow(non_snake_case)]
+                    let $tys: RawValue = self.$field.into_value().into();
+                )*
+                let v: Vec<RawValue> = vec![$($tys),*];
+
+                Value::ValueArray(v.into_boxed_slice())
+            }
         }
-
-        match value {
-            Value::ValueArrayRef(raw) => Ok((conv(raw.get(0))?, conv(raw.get(1))?)),
-            Value::ValueArray(ref raw) => Ok((conv(raw.get(0))?, conv(raw.get(1))?)),
-            _ => Err(Error::WrongType),
-        }
-    }
-
-    fn into_value(self) -> Value<'a> {
-        // TODO: allow without boxing?
-
-        let a: RawValue = self.0.into_value().into();
-        let b: RawValue = self.1.into_value().into();
-        let v: Vec<RawValue> = vec![a, b];
-
-        Value::ValueArray(v.into_boxed_slice())
-    }
+    };
 }
+
+impl_conv_tuple!(A.0 B.1);
+impl_conv_tuple!(A.0 B.1 C.2);
+impl_conv_tuple!(A.0 B.1 C.2 D.3);
+impl_conv_tuple!(A.0 B.1 C.2 D.3 E.4);
 
 macro_rules! impl_value_conv {
     ($ty:ident, $variant:ident $(($lt:tt))*) => {
@@ -89,3 +92,42 @@ impl_value_conv!(f64, Float);
 impl_value_conv!(Interned, Interned);
 impl_value_conv!(NodeHandle, Node);
 impl_value_conv!(NodeHandleRef, NodeRef ('a));
+
+fn conv_opt<'a, T>(raw: Option<&RawValue>) -> Result<T>
+    where
+        T: ValueConv<'a>,
+{
+    raw.ok_or(Error::InvalidArgumentTypes)
+        .and_then(|raw| unsafe { Value::from_raw(*raw).into_res() })
+        .and_then(|val| T::from_value(val))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fmt::Debug;
+    use super::*;
+
+    /// Convert `T` -> `Value` -> `RawValue` -> `Value` -> `T` and check for equality.
+    fn check_equal<T>(start: T)
+    where
+        T: Clone + Debug + PartialEq + for<'a> ValueConv<'a>,
+    {
+        let value = start.clone().into_value();
+        let raw: RawValue = value.into();
+        let value = unsafe { Value::from_raw(raw) };
+        let end = ValueConv::from_value(value);
+
+        assert_eq!(end, Ok(start));
+    }
+
+    #[test]
+    fn check_primitives() {
+        check_equal(99u64);
+        check_equal(43i64);
+        check_equal(-43i64);
+        check_equal(-3.14f64);
+        check_equal(true);
+        check_equal(false);
+        check_equal(Interned::from("my_ident"));
+    }
+}
