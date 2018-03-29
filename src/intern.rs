@@ -79,15 +79,11 @@ pub struct InternedPathBuf(Vec<Interned>);
 
 impl InternedPathBuf {
     pub fn from_iter<I, T>(iter: I) -> Self
-        where
-            I: IntoIterator<Item = T>,
-            T: Into<Interned>,
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Interned>,
     {
-        InternedPathBuf(
-            iter.into_iter()
-                .map(Into::into)
-                .collect(),
-        )
+        InternedPathBuf(iter.into_iter().map(Into::into).collect())
     }
 
     pub fn from_str(s: &str) -> Self {

@@ -2,11 +2,14 @@ extern crate fern;
 extern crate log;
 extern crate vnodes;
 
-use vnodes::{Vnodes, Result};
+use vnodes::{MapNode, Result, Vnodes};
 
 fn run() -> Result<()> {
     let nodes = Vnodes::new();
-    nodes.insert("foo", -5i64)?;
+    nodes.insert("/foo", -5i64)?;
+    nodes.insert("/bar", MapNode::new_node())?;
+    nodes.insert("bar/abc", 1u64)?;
+    nodes.insert("/bar/5", 55u64)?;
 
     assert_eq!(nodes.get("/foo"), Ok(-5i64));
 

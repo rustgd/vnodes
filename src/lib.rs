@@ -89,8 +89,7 @@ impl Vnodes {
         let value = value.into_value();
 
         self.get_no_alloc(path_buf, |node| {
-            node
-                .as_node_handle()
+            node.as_node_handle()
                 .map(move |node| node.insert(self, target, value))
         })
     }

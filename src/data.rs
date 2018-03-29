@@ -235,10 +235,10 @@ impl<'a> From<Value<'a>> for RawValue {
                 }
             }
             Value::Node(node) => RawValue {
-                flags: Flags::NODE | Flags::ALLOCATED,
+                flags: Flags::NODE_BOXED,
                 extra: 0,
                 value: RawValueInner {
-                    node_data: node.raw(),
+                    node_data: NodeHandle::into_raw(node),
                 },
             },
             Value::NodeRef(node) => RawValue {

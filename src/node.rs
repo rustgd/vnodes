@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::mem::forget;
 use std::process::abort;
 use std::ptr::{null, null_mut};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -136,7 +137,8 @@ where
                     assert_eq!(this.strong.load(Ordering::Acquire), 0);
 
                     // Don't rely on type inference here
-                    let b: Box<NodeData<T>> = Box::from_raw(this as *const NodeData<T> as *mut NodeData<T>);
+                    let b: Box<NodeData<T>> =
+                        Box::from_raw(this as *const NodeData<T> as *mut NodeData<T>);
                     drop(b);
                 }
                 _ => {}
@@ -164,6 +166,11 @@ impl NodeHandle {
     {
         let boxed = NodeData::new(node);
 
+        trace!(
+            "Node data with node {:x} created",
+            boxed.as_ref() as *const _ as usize
+        );
+
         unsafe { NodeHandle::from_raw(Box::into_raw(boxed) as *mut RawNodeData) }
     }
 
@@ -181,12 +188,20 @@ impl NodeHandle {
         self.data.insert(context, ident, value);
     }
 
-    pub fn raw(&self) -> *mut RawNodeData {
+    pub fn into_raw(this: Self) -> *mut RawNodeData {
+        let raw = this.data.raw();
+
+        forget(this);
+
+        raw
+    }
+
+    pub fn as_raw(&self) -> *mut RawNodeData {
         self.data.raw()
     }
 
     pub fn handle_ref<'a>(&'a self) -> NodeHandleRef<'a> {
-        unsafe { NodeHandleRef::from_raw(self.raw()) }
+        unsafe { NodeHandleRef::from_raw(self.as_raw()) }
     }
 }
 
@@ -237,7 +252,7 @@ impl<'a> NodeHandleRef<'a> {
                 self,
                 context as *const Vnodes as RawContextPtr,
                 Action::Set,
-                (ident, value).into_value().into()
+                (ident, value).into_value().into(),
             );
         }
     }
@@ -258,7 +273,7 @@ impl<'a> NodeHandleRef<'a> {
         this: &'b Self,
         context: *mut Vnodes,
         action: Action,
-        arg: RawValue
+        arg: RawValue,
     ) -> Value<'b> {
         let raw = &*this.inner;
 
