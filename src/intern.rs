@@ -23,6 +23,7 @@ impl<'a> From<&'a str> for Interned {
 fn intern_byte(b: u8) -> u8 {
     match b {
         b'a'...b'z' => b - b'a',
+        b'A'...b'Z' => b - b'A',
         b'0'...b'9' => b - b'0' + 26,
         b'-' | b'_' => 36,
         b'.' => 37,
