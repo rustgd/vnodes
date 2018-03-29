@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports)]
 
 #[macro_use]
 extern crate bitflags;
@@ -15,7 +15,7 @@ pub use alloc::Allocator;
 pub use conv::ValueConv;
 pub use data::Value;
 pub use error::{Error, Result};
-pub use intern::Interned;
+pub use intern::{Interned, InternedPath, InternedPathBuf};
 pub use map::MapNode;
 pub use node::{Node, NodeData, NodeHandle, NodeHandleRef, NodeMut};
 

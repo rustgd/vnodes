@@ -66,10 +66,6 @@ impl Allocator {
     pub unsafe fn debug(&mut self) {
         println!(
             "Allocator {{ buffer: {:#?}, prev_size: {:?}, cursor: {} }}",
-            /*(*self.buffer.get())[0..self.cursor]
-                .iter()
-                .map(|cell| format!("[0x{:x}, 0x{:x}]", conv64(&cell[0..8]), conv64(&cell[8..16])))
-                .collect::<Vec<_>>(),*/
             "<>",
             &self.prev_size[0..self.cursor + 1],
             self.cursor

@@ -6,37 +6,37 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use parking_lot::RwLock;
 
 use raw::*;
-use {Interned, Value, Vnodes};
+use {Interned, Result, Value, ValueConv, Vnodes};
 
 pub trait Node: Send + Sync {
-    fn call(&self, context: &Vnodes, args: &[Value]) -> Value;
+    fn call(&self, context: &Vnodes, args: &[Value]) -> Result<Value>;
 
-    fn get(&self, context: &Vnodes, ident: Interned) -> Value;
+    fn get(&self, context: &Vnodes, ident: Interned) -> Result<Value>;
 
-    fn set(&self, context: &Vnodes, ident: Interned, value: Value<'static>);
+    fn set(&self, context: &Vnodes, ident: Interned, value: Value<'static>) -> Result<()>;
 }
 
 pub trait NodeMut: Send + Sync {
-    fn call(&self, context: &Vnodes, args: &[Value]) -> Value<'static>;
+    fn call(&self, context: &Vnodes, args: &[Value]) -> Result<Value<'static>>;
 
-    fn get(&self, context: &Vnodes, ident: Interned) -> Value<'static>;
+    fn get(&self, context: &Vnodes, ident: Interned) -> Result<Value<'static>>;
 
-    fn set(&mut self, context: &Vnodes, ident: Interned, value: Value<'static>);
+    fn set(&mut self, context: &Vnodes, ident: Interned, value: Value<'static>) -> Result<()>;
 }
 
 impl<T> Node for RwLock<T>
 where
     T: NodeMut,
 {
-    fn call(&self, context: &Vnodes, args: &[Value]) -> Value {
+    fn call(&self, context: &Vnodes, args: &[Value]) -> Result<Value> {
         self.read().call(context, args)
     }
 
-    fn get(&self, context: &Vnodes, ident: Interned) -> Value {
+    fn get(&self, context: &Vnodes, ident: Interned) -> Result<Value> {
         self.read().get(context, ident)
     }
 
-    fn set(&self, context: &Vnodes, ident: Interned, value: Value<'static>) {
+    fn set(&self, context: &Vnodes, ident: Interned, value: Value<'static>) -> Result<()> {
         self.write().set(context, ident, value)
     }
 }
@@ -56,7 +56,7 @@ where
     fn new(node: T) -> Box<Self> {
         let data = NodeData {
             _raw: RawNodeData {
-                action: _action_node_data::<T>,
+                action: raw_action_node_data::<T>,
             },
             node,
             strong: AtomicUsize::new(1),
@@ -67,56 +67,55 @@ where
     }
 }
 
-unsafe extern "C" fn _action_node_data<T>(
+unsafe extern "C" fn raw_action_node_data<T>(
     node_data: *mut RawNodeData,
     context: *mut Vnodes,
     action: Action,
-    len: usize,
-    args: *const RawValue,
+    arg: RawValue,
 ) -> RawValue
 where
     T: Node + 'static,
 {
+    let arg = Value::from_raw(arg);
+
     trace!(
-        "action function called with args {:x}, {:x}, {:?}, {}, {:x}",
+        "action function called with args {{ node: {:x}, context: {:x}, action: {:?}, arg: {:?} }}",
         node_data as usize,
         context as usize,
         action,
-        len,
-        args as usize,
+        arg,
     );
 
     let this = node_data as *const NodeData<T>;
     let this = &*this;
 
+    Value::from_res(action_node_data(this, context, action, arg)).into()
+}
+
+unsafe fn action_node_data<'a, T>(
+    this: &'a NodeData<T>,
+    context: RawContextPtr,
+    action: Action,
+    arg: Value,
+) -> Result<Value<'a>>
+where
+    T: Node + 'static,
+{
     match action {
         Action::Call => unimplemented!(),
         Action::Get => {
             let context = &*context;
-            assert_eq!(len, 1);
+            let ident: Interned = ValueConv::from_value(arg)?;
 
-            let ident = *args;
-            assert_eq!(ident.flags, Flags::INTERNED);
-
-            let ident = ident.value.interned;
-
-            this.node.get(context, ident).into()
+            this.node.get(context, ident)
         }
         Action::Set => {
-            let context = &*context;
-            assert_eq!(len, 2);
+            let (ident, value): (Interned, Value) = ValueConv::from_value(arg)?;
+            let value = value.make_owned();
 
-            let args = args as *const [RawValue; 2];
-            let args = &*args;
+            this.node.set(&*context, ident, value)?;
 
-            let ident = args[0];
-            assert_eq!(ident.flags, Flags::INTERNED);
-            let ident = ident.value.interned;
-
-            let value = args[1];
-            let value = Value::from_raw(value);
-
-            this.node.set(context, ident, value).into()
+            Ok(Value::Void)
         }
         Action::Clone => {
             let old = this.strong.fetch_add(1, Ordering::Relaxed);
@@ -126,7 +125,7 @@ where
                 abort();
             }
 
-            ().into()
+            Ok(Value::Void)
         }
         Action::Drop => {
             let old = this.strong.fetch_sub(1, Ordering::Relaxed);
@@ -134,16 +133,16 @@ where
             match old {
                 1 => {
                     // Synchronize with other threads to make sure we have unique ownership
-                    assert_eq!(this.strong.load(Ordering::Relaxed), 0);
+                    assert_eq!(this.strong.load(Ordering::Acquire), 0);
 
                     // Don't rely on type inference here
-                    let b: Box<NodeData<T>> = Box::from_raw(node_data as *mut NodeData<T>);
+                    let b: Box<NodeData<T>> = Box::from_raw(this as *const NodeData<T> as *mut NodeData<T>);
                     drop(b);
                 }
                 _ => {}
             }
 
-            ().into()
+            Ok(Value::Void)
         }
         Action::List => unimplemented!(),
     }
@@ -223,25 +222,18 @@ impl<'a> NodeHandleRef<'a> {
                 self,
                 context as *const Vnodes as RawContextPtr,
                 Action::Get,
-                1,
-                &ident as RawValueList,
+                ident,
             )
         }
     }
 
     pub fn insert(&self, context: &Vnodes, ident: Interned, value: Value<'static>) {
-        let ident: RawValue = Value::Interned(ident).into();
-        let raw_value: RawValue = value.into();
-        let list = [ident, raw_value];
-        let list: RawValueList = list.as_ptr();
-
         unsafe {
             Self::action(
                 self,
                 context as *const Vnodes as RawContextPtr,
                 Action::Set,
-                2,
-                list,
+                (ident, value).into_value().into()
             );
         }
     }
@@ -262,20 +254,19 @@ impl<'a> NodeHandleRef<'a> {
         this: &'b Self,
         context: *mut Vnodes,
         action: Action,
-        len: usize,
-        args: *const RawValue,
+        arg: RawValue
     ) -> Value<'b> {
         let raw = &*this.inner;
 
-        Value::from_raw((raw.action)(this.inner, context, action, len, args))
+        Value::from_raw((raw.action)(this.inner, context, action, arg))
     }
 
     pub unsafe fn clone(this: &Self) {
-        Self::action(this, null_mut(), Action::Clone, 0, null());
+        Self::action(this, null_mut(), Action::Clone, Value::Void.into());
     }
 
     pub unsafe fn drop(this: &mut Self) {
-        Self::action(this, null_mut(), Action::Drop, 0, null());
+        Self::action(this, null_mut(), Action::Drop, Value::Void.into());
     }
 }
 

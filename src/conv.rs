@@ -1,5 +1,6 @@
 //! Conversion traits for type -> value and value -> type
 
+use raw::RawValue;
 use {Error, Interned, NodeHandle, NodeHandleRef, Result, Value};
 
 pub trait ValueConv<'a>: Sized {
@@ -28,6 +29,39 @@ impl<'a> ValueConv<'a> for Value<'a> {
 
     fn into_value(self) -> Value<'a> {
         self
+    }
+}
+
+impl<'a, A, B> ValueConv<'a> for (A, B)
+where
+    A: ValueConv<'a>,
+    B: ValueConv<'a>,
+{
+    fn from_value(value: Value<'a>) -> Result<Self> {
+        fn conv<'a, T>(raw: Option<&RawValue>) -> Result<T>
+        where
+            T: ValueConv<'a>,
+        {
+            raw.ok_or(Error::InvalidArgumentTypes)
+                .and_then(|raw| unsafe { Value::from_raw(*raw).into_res() })
+                .and_then(|val| T::from_value(val))
+        }
+
+        match value {
+            Value::ValueArrayRef(raw) => Ok((conv(raw.get(0))?, conv(raw.get(1))?)),
+            Value::ValueArray(ref raw) => Ok((conv(raw.get(0))?, conv(raw.get(1))?)),
+            _ => Err(Error::WrongType),
+        }
+    }
+
+    fn into_value(self) -> Value<'a> {
+        // TODO: allow without boxing?
+
+        let a: RawValue = self.0.into_value().into();
+        let b: RawValue = self.1.into_value().into();
+        let v: Vec<RawValue> = vec![a, b];
+
+        Value::ValueArray(v.into_boxed_slice())
     }
 }
 

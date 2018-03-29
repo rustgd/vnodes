@@ -8,10 +8,12 @@ pub enum Error {
     ExpectedNode = 0x2,
     #[fail(display = "Invalid argument types")]
     InvalidArgumentTypes = 0x3,
+    #[fail(display = "No such entry")]
+    NoSuchEntry = 0x4,
     #[fail(display = "Unknown type")]
     UnknownTypeFlags = 0x5,
     #[fail(display = "Wrong type")]
-    WrongType = 0x4,
+    WrongType = 0x6,
 }
 
 pub type Result<T> = ::std::result::Result<T, Error>;

@@ -2,7 +2,7 @@ use std::mem::swap;
 
 use parking_lot::RwLock;
 
-use {Interned, NodeHandle, NodeMut, Value, Vnodes};
+use {Error, Interned, NodeHandle, NodeMut, Result, Value, Vnodes};
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
@@ -72,16 +72,18 @@ impl MapNode {
 }
 
 impl NodeMut for MapNode {
-    fn call(&self, _: &Vnodes, _: &[Value]) -> Value<'static> {
+    fn call(&self, _: &Vnodes, _: &[Value]) -> Result<Value<'static>> {
         unimplemented!()
     }
 
-    fn get(&self, _: &Vnodes, ident: Interned) -> Value<'static> {
-        self.map.get(ident).cloned().unwrap()
+    fn get(&self, _: &Vnodes, ident: Interned) -> Result<Value<'static>> {
+        self.map.get(ident).cloned().ok_or(Error::NoSuchEntry)
     }
 
-    fn set(&mut self, _: &Vnodes, ident: Interned, value: Value<'static>) {
+    fn set(&mut self, _: &Vnodes, ident: Interned, value: Value<'static>) -> Result<()> {
         self.map.insert(ident, value);
+
+        Ok(())
     }
 }
 
