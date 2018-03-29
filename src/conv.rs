@@ -1,7 +1,7 @@
 //! Conversion traits for type -> value and value -> type
 
 use raw::RawValue;
-use {Error, Interned, NodeHandle, NodeHandleRef, Result, Value};
+use {Error, Interned, InternedPath, InternedPathBuf, NodeHandle, NodeHandleRef, Result, Value};
 
 pub trait ValueConv<'a>: Sized {
     fn from_value(value: Value<'a>) -> Result<Self>;
@@ -85,11 +85,16 @@ macro_rules! impl_value_conv {
     };
 }
 
+// Typedef to make macro call below work
+type InternedPathRef<'a> = &'a InternedPath;
+
 impl_value_conv!(i64, Signed);
 impl_value_conv!(u64, Unsigned);
 impl_value_conv!(bool, Bool);
 impl_value_conv!(f64, Float);
 impl_value_conv!(Interned, Interned);
+impl_value_conv!(InternedPathBuf, InternedPathBuf);
+impl_value_conv!(InternedPathRef, InternedPathRef ('a));
 impl_value_conv!(NodeHandle, Node);
 impl_value_conv!(NodeHandleRef, NodeRef ('a));
 
@@ -140,5 +145,11 @@ mod tests {
             (Interned::from("nested"), Interned::from("tuples")),
             -91.0f64,
         ));
+    }
+
+    #[test]
+    fn check_paths() {
+        check_equal(Interned::from("simple"));
+        check_equal(InternedPathBuf::from("simple/path/to/hell"));
     }
 }

@@ -38,6 +38,7 @@ bitflags! {
         const NODE_BOXED = Self::NODE.bits | Self::BOXED.bits;
         const INTEGER_SIGNED = Self::INTEGER.bits | Self::SIGNED.bits;
         const INTERNED_PATH = Self::INTERNED.bits | Self::ARRAY.bits;
+        const INTERNED_PATH_BUF = Self::INTERNED.bits | Self::ARRAY.bits | Self::BOXED.bits;
     }
 }
 
@@ -80,6 +81,7 @@ pub union RawValueInner {
     pub error: Error,
     pub float: f64,
     pub interned: Interned,
+    pub interned_path: *const Interned,
     pub node_data: *mut RawNodeData,
     pub signed: i64,
     pub unsigned: u64,
@@ -95,8 +97,8 @@ pub enum Value<'a> {
     Error(Error),
     Float(f64),
     Interned(Interned),
-    //InternedPathBuf(InternedPathBuf),
-    //InternedPathRef(&'a InternedPath),
+    InternedPathBuf(InternedPathBuf),
+    InternedPathRef(&'a InternedPath),
     Node(NodeHandle),
     NodeRef(NodeHandleRef<'a>),
     Signed(i64),
@@ -120,7 +122,17 @@ impl<'a> Value<'a> {
             Flags::INTEGER => Value::Unsigned(raw.value.unsigned),
             Flags::INTEGER_SIGNED => Value::Signed(raw.value.signed),
             Flags::INTERNED => Value::Interned(raw.value.interned),
-            Flags::INTERNED_PATH => unimplemented!(),
+            Flags::INTERNED_PATH => Value::InternedPathRef(from_raw_parts(
+                raw.value.interned_path as *const u64,
+                raw.extra as usize,
+            )),
+            Flags::INTERNED_PATH_BUF => {
+                let slice =
+                    from_raw_parts(raw.value.interned_path as *const u64, raw.extra as usize);
+                let boxed = Box::from_raw(slice as *const [u64] as *mut [u64]);
+
+                Value::InternedPathBuf(InternedPathBuf::from(boxed))
+            }
             Flags::NODE => Value::NodeRef(NodeHandleRef::from_raw(raw.value.node_data)),
             Flags::NODE_BOXED => Value::Node(NodeHandle::from_raw(raw.value.node_data)),
             Flags::VALUE_ARRAY => {
@@ -156,6 +168,8 @@ impl<'a> Value<'a> {
             Value::Error(e) => Value::Error(e),
             Value::Float(f) => Value::Float(f),
             Value::Interned(i) => Value::Interned(i),
+            Value::InternedPathBuf(b) => Value::InternedPathBuf(b),
+            Value::InternedPathRef(r) => Value::InternedPathBuf(InternedPathBuf::from(r)),
             Value::Node(n) => Value::Node(n),
             Value::NodeRef(n) => Value::Node(n.to_handle()),
             Value::Signed(s) => Value::Signed(s),
@@ -196,6 +210,24 @@ impl<'a> From<Value<'a>> for RawValue {
                 extra: 0,
                 value: RawValueInner { interned },
             },
+            Value::InternedPathBuf(b) => {
+                let boxed = b.into_boxed_slice();
+                RawValue {
+                    flags: Flags::INTERNED_PATH_BUF,
+                    extra: boxed.len() as u32,
+                    value: RawValueInner {
+                        interned_path: Box::into_raw(boxed) as *const Interned,
+                    },
+                }
+            }
+            Value::InternedPathRef(r) => {
+                let ptr = r.as_ptr() as *const Interned;
+                RawValue {
+                    flags: Flags::INTERNED_PATH,
+                    extra: r.len() as u32,
+                    value: RawValueInner { interned_path: ptr },
+                }
+            }
             Value::Node(node) => RawValue {
                 flags: Flags::NODE | Flags::ALLOCATED,
                 extra: 0,
@@ -223,12 +255,16 @@ impl<'a> From<Value<'a>> for RawValue {
             Value::ValueArray(array) => RawValue {
                 flags: Flags::VALUE_ARRAY_BOXED,
                 extra: array.len() as u32,
-                value: RawValueInner { value_array: Box::into_raw(array) as *const RawValue },
+                value: RawValueInner {
+                    value_array: Box::into_raw(array) as *const RawValue,
+                },
             },
             Value::ValueArrayRef(array) => RawValue {
                 flags: Flags::VALUE_ARRAY,
                 extra: array.len() as u32,
-                value: RawValueInner { value_array: array.as_ptr() },
+                value: RawValueInner {
+                    value_array: array.as_ptr(),
+                },
             },
             Value::Void => RawValue {
                 flags: Flags::empty(),
