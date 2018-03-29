@@ -77,32 +77,11 @@ pub type InternedPath = [Interned];
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct InternedPathBuf(Vec<Interned>);
 
-impl From<Box<[Interned]>> for InternedPathBuf {
-    fn from(slice: Box<[Interned]>) -> Self {
-        InternedPathBuf(slice.into_vec())
-    }
-}
-
-impl<'a, T> From<&'a [T]> for InternedPathBuf
-where
-    &'a T: Into<Interned>,
-{
-    fn from(slice: &'a [T]) -> Self {
-        InternedPathBuf::from_iter(slice)
-    }
-}
-
-impl<'a> From<&'a str> for InternedPathBuf {
-    fn from(s: &str) -> Self {
-        InternedPathBuf::from_iter(s.split('/'))
-    }
-}
-
 impl InternedPathBuf {
     pub fn from_iter<I, T>(iter: I) -> Self
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Interned>,
+        where
+            I: IntoIterator<Item = T>,
+            T: Into<Interned>,
     {
         InternedPathBuf(
             iter.into_iter()
@@ -125,6 +104,31 @@ impl InternedPathBuf {
 
     pub fn path(&self) -> &InternedPath {
         &self.0
+    }
+
+    pub fn pop(&mut self) -> Option<Interned> {
+        self.0.pop()
+    }
+}
+
+impl From<Box<[Interned]>> for InternedPathBuf {
+    fn from(slice: Box<[Interned]>) -> Self {
+        InternedPathBuf(slice.into_vec())
+    }
+}
+
+impl<'a, T> From<&'a [T]> for InternedPathBuf
+where
+    &'a T: Into<Interned>,
+{
+    fn from(slice: &'a [T]) -> Self {
+        InternedPathBuf::from_iter(slice)
+    }
+}
+
+impl<'a> From<&'a str> for InternedPathBuf {
+    fn from(s: &str) -> Self {
+        InternedPathBuf::from_iter(s.split('/'))
     }
 }
 

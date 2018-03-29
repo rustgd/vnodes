@@ -2,7 +2,16 @@ extern crate fern;
 extern crate log;
 extern crate vnodes;
 
-use vnodes::Vnodes;
+use vnodes::{Vnodes, Result};
+
+fn run() -> Result<()> {
+    let nodes = Vnodes::new();
+    nodes.insert("foo", -5i64)?;
+
+    assert_eq!(nodes.get("/foo"), Ok(-5i64));
+
+    Ok(())
+}
 
 fn main() {
     fern::Dispatch::new()
@@ -19,8 +28,7 @@ fn main() {
         .apply()
         .unwrap();
 
-    let nodes = Vnodes::new();
-    nodes.insert("foo", -5i64);
-
-    assert_eq!(nodes.get("/foo"), Ok(-5i64));
+    if let Err(e) = run() {
+        eprintln!("Error: {}", e);
+    }
 }

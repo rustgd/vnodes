@@ -160,6 +160,14 @@ impl<'a> Value<'a> {
         }
     }
 
+    pub fn as_node_handle(&self) -> Result<NodeHandleRef> {
+        match *self {
+            Value::Node(ref node) => Ok(node.handle_ref()),
+            Value::NodeRef(node) => Ok(node),
+            _ => Err(Error::WrongType),
+        }
+    }
+
     pub fn make_owned(self) -> Value<'static> {
         match self {
             Value::Bool(b) => Value::Bool(b),

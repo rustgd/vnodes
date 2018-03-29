@@ -20,6 +20,8 @@ mod export {
     ) {
         let context = &*context;
 
-        context.insert(ident, Value::from_raw(value));
+        // TODO
+        //context.insert(&[ident], Value::from_raw(value));
+        unimplemented!()
     }
 }

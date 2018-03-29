@@ -48,20 +48,20 @@ impl Vnodes {
         }
     }
 
-    pub fn get<I, R>(&self, ident: I) -> Result<R>
+    pub fn get<I, R>(&self, path: I) -> Result<R>
     where
         I: Into<InternedPathBuf>,
         R: ValueConv<'static>,
     {
-        self.get_no_alloc(ident, |val| R::from_value(val.make_owned()))
+        self.get_no_alloc(path, |val| R::from_value(val.make_owned()))
     }
 
-    pub fn get_no_alloc<F, I, R>(&self, ident: I, f: F) -> Result<R>
-        where
-            F: FnOnce(Value) -> Result<R>,
-            I: Into<InternedPathBuf>,
+    pub fn get_no_alloc<F, I, R>(&self, path: I, f: F) -> Result<R>
+    where
+        F: FnOnce(Value) -> Result<R>,
+        I: Into<InternedPathBuf>,
     {
-        let path_buf = ident.into();
+        let path_buf = path.into();
         let mut path = path_buf.path();
         let start = match path.get(0).cloned() {
             Some(Interned(0)) => {
@@ -78,13 +78,21 @@ impl Vnodes {
         }
     }
 
-    pub fn insert<I, V>(&self, ident: I, value: V)
+    pub fn insert<I, V>(&self, path: I, value: V) -> Result<()>
     where
-        I: Into<Interned>,
+        I: Into<InternedPathBuf>,
         V: ValueConv<'static>,
     {
-        // TODO: absolute check
-        self.root.insert(self, ident.into(), value.into_value());
+        let mut path_buf = path.into();
+        let target = path_buf.pop().ok_or(Error::PathEmpty)?;
+
+        let value = value.into_value();
+
+        self.get_no_alloc(path_buf, |node| {
+            node
+                .as_node_handle()
+                .map(move |node| node.insert(self, target, value))
+        })
     }
 }
 
@@ -93,7 +101,7 @@ where
     F: FnOnce(Value) -> Result<R>,
 {
     // TODO: let node methods return Result
-    // TODO: or should the Rust `Value` even store errors?
+    // TODO: and: should the Rust `Value` even store errors?
     let value = handle.get(context, path[0]).into_res()?;
 
     match path.get(1).cloned() {
@@ -107,9 +115,11 @@ where
             f(value)
         }
         Some(_) => {
-            // TODO: allow borrowed
-            let node: NodeHandle = ValueConv::from_value(value)?;
-            let handle_ref = node.handle_ref();
+            let handle_ref = match value {
+                Value::Node(ref node) => node.handle_ref(),
+                Value::NodeRef(node) => node,
+                _ => return Err(Error::WrongType),
+            };
 
             walk_node(context, handle_ref, &path[1..], f)
         }
