@@ -16,29 +16,38 @@ pub enum Action {
 bitflags! {
     #[repr(C)]
     pub struct Flags: u32 {
-        // -- Exclusive flags
-        const NODE = 0x1;
-        const STRING = 0x2;
-        const INTEGER = 0x4;
-        const FLOAT = 0x8;
-        const BOOL = 0x10;
-        const INTERNED = 0x20;
-        const ERROR = 0x40;
+        // -- Type flags
+        const _NODE = 0x1;
+        const _STRING = 0x2;
+        const _INTEGER = 0x4;
+        const _FLOAT = 0x8;
+        const _BOOL = 0x10;
+        const _INTERNED = 0x20;
+        const _ERROR = 0x40;
         // --
 
-        const SIGNED = 0x100;
-        const ALLOCATED = 0x200;
-        const BOXED = 0x400;
-        const ARRAY = 0x800;
+        // -- Variant flags
+        const _SIGNED = 0x100;
+        const _ALLOCATED = 0x200;
+        const _BOXED = 0x400;
+        const _ARRAY = 0x800;
+        // --
 
-        /// No flag means no value
+        // -- Combined flags
+        const BOOL = Self::_BOOL.bits;
+        const ERROR = Self::_ERROR.bits;
+        const FLOAT = Self::_FLOAT.bits;
+        const INTEGER = Self::_INTEGER.bits;
+        const INTEGER_SIGNED = Self::_INTEGER.bits | Self::_SIGNED.bits;
+        const INTERNED = Self::_INTERNED.bits;
+        const INTERNED_PATH = Self::_INTERNED.bits | Self::_ARRAY.bits;
+        const INTERNED_PATH_BUF = Self::_INTERNED.bits | Self::_ARRAY.bits | Self::_BOXED.bits;
+        const NODE = Self::_NODE.bits;
+        const NODE_BOXED = Self::_NODE.bits | Self::_BOXED.bits;
+        const VALUE_ARRAY = Self::_ARRAY.bits;
+        const VALUE_ARRAY_BOXED = Self::_ARRAY.bits | Self::_BOXED.bits;
         const VOID = 0x0;
-        const VALUE_ARRAY = Self::ARRAY.bits;
-        const VALUE_ARRAY_BOXED = Self::ARRAY.bits | Self::BOXED.bits;
-        const NODE_BOXED = Self::NODE.bits | Self::BOXED.bits;
-        const INTEGER_SIGNED = Self::INTEGER.bits | Self::SIGNED.bits;
-        const INTERNED_PATH = Self::INTERNED.bits | Self::ARRAY.bits;
-        const INTERNED_PATH_BUF = Self::INTERNED.bits | Self::ARRAY.bits | Self::BOXED.bits;
+        // --
     }
 }
 
@@ -249,7 +258,7 @@ impl<'a> From<Value<'a>> for RawValue {
                 },
             },
             Value::Signed(signed) => RawValue {
-                flags: Flags::INTEGER | Flags::SIGNED,
+                flags: Flags::INTEGER_SIGNED,
                 extra: 0,
                 value: RawValueInner { signed },
             },
