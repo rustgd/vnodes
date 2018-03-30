@@ -21,8 +21,19 @@ impl FatPtr {
     }
 }
 
+/// IMPORTANT: size is the number of elements (for a slice)
 pub unsafe fn drop_maybe_sized<T: ?Sized>(ptr: *mut (), size: usize) {
-    drop_in_place::<T>(FatPtr { ptr, size }.into_fat::<T>())
+    drop_in_place::<T>(into_maybe_fat_mut::<T>(ptr, size))
+}
+
+/// IMPORTANT: size is the number of elements (for a slice)
+pub unsafe fn into_maybe_fat<T: ?Sized>(ptr: *const (), size: usize) -> *const T {
+    into_maybe_fat_mut(ptr as *mut (), size) as *const T
+}
+
+/// IMPORTANT: size is the number of elements (for a slice)
+pub unsafe fn into_maybe_fat_mut<T: ?Sized>(ptr: *mut (), size: usize) -> *mut T {
+    FatPtr { ptr, size }.into_fat::<T>()
 }
 
 pub fn is_fat<T: ?Sized>() -> bool {

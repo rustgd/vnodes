@@ -1,8 +1,7 @@
 use std::marker::PhantomData;
 use std::mem::{forget, size_of, size_of_val};
 use std::ptr;
-
-use util::drop_maybe_sized;
+use util::{drop_maybe_sized, into_maybe_fat, into_maybe_fat_mut};
 
 const ALIGN: usize = 0x1 << ALIGN_LOG;
 const ALIGN_LOG: usize = 4;
@@ -22,15 +21,33 @@ impl Allocator {
         }
     }
 
-    pub fn get<'a: 'b, 'b, T>(&'a self, index: &'b AllocIndex<T>) -> &'b T {
-        unsafe { &*(self.raw.ptr(index.index as usize) as *const T) }
+    pub fn get<'a, 'b, T>(&'a self, index: &'b AllocIndex<T>) -> &'b T
+    where
+        'a: 'b,
+        T: Data + ?Sized,
+    {
+        unsafe {
+            &*into_maybe_fat(
+                self.raw.ptr(index.index as usize),
+                T::bytes_to_len(index.size as usize),
+            )
+        }
     }
 
-    pub fn get_mut<'a: 'b, 'b, T>(&'a mut self, index: &'b mut AllocIndex<T>) -> &'b mut T {
-        unsafe { &mut *(self.raw.ptr_mut(index.index as usize) as *mut T) }
+    pub fn get_mut<'a, 'b, T>(&'a mut self, index: &'b mut AllocIndex<T>) -> &'b mut T
+    where
+        'a: 'b,
+        T: Data + ?Sized,
+    {
+        unsafe {
+            &mut *into_maybe_fat_mut(
+                self.raw.ptr_mut(index.index as usize),
+                T::bytes_to_len(index.size as usize),
+            )
+        }
     }
 
-    pub fn push<T>(&mut self, value: T) -> AllocIndex<T> {
+    pub fn push<T: Data + Sized>(&mut self, value: T) -> AllocIndex<T> {
         let size = size_of::<T>();
         let index = self.raw.allocate(size_of::<T>());
 
@@ -48,8 +65,8 @@ impl Allocator {
         }
     }
 
-    pub fn push_boxed<T: ?Sized>(&mut self, value: Box<T>) -> AllocIndex<T> {
-        let size = size_of_val(value.as_ref());
+    pub fn push_boxed<T: Data + ?Sized>(&mut self, value: Box<T>) -> AllocIndex<T> {
+        let size = size_of_val(value.as_ref() as &T);
         let index = self.raw.allocate(size);
 
         unsafe {
@@ -70,7 +87,7 @@ impl Allocator {
         }
     }
 
-    pub fn pop<T>(&mut self, index: AllocIndex<T>) -> T {
+    pub fn pop<T: Data + Sized>(&mut self, index: AllocIndex<T>) -> T {
         unsafe {
             let ptr = self.raw.ptr_mut(index.index as usize);
             let value = ptr::read(ptr as *const T);
@@ -86,10 +103,11 @@ impl Allocator {
         }
     }
 
-    pub fn pop_unsized<T: ?Sized>(&mut self, index: AllocIndex<T>) {
+    pub fn pop_unsized<T: Data + ?Sized>(&mut self, index: AllocIndex<T>) {
         unsafe {
             let ptr = self.raw.ptr_mut(index.index as usize);
-            drop_maybe_sized::<T>(ptr, index.size as usize);
+            let len = T::bytes_to_len(index.size as usize);
+            drop_maybe_sized::<T>(ptr, len);
             self.raw
                 .deallocate(index.index as usize, index.size as usize);
 
@@ -112,6 +130,22 @@ pub struct AllocIndex<T: ?Sized> {
 impl<T: ?Sized> Drop for AllocIndex<T> {
     fn drop(&mut self) {
         error!("Memory leak: `AllocIndex` dropped, value was not popped")
+    }
+}
+
+pub unsafe trait Data {
+    fn bytes_to_len(bytes: usize) -> usize;
+}
+
+unsafe impl<T: Sized> Data for T {
+    fn bytes_to_len(bytes: usize) -> usize {
+        bytes
+    }
+}
+
+unsafe impl<T> Data for [T] {
+    fn bytes_to_len(bytes: usize) -> usize {
+        bytes / size_of::<T>()
     }
 }
 
@@ -243,6 +277,30 @@ mod tests {
         assert_eq!(alloc.get(&index), &(5, 13, 3));
 
         // This should still work
+        alloc.pop_unsized(index);
+    }
+
+    #[test]
+    fn test_coerce_unsized() {
+        let mut alloc = Allocator::new();
+        let index: AllocIndex<[i32; 10]> = alloc.push([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+        //let mut index = index as AllocIndex<[i32]>;
+
+        // TODO: this does not work with current stable Rust
+        // TODO: a conversion from `AllocIndex<Sized>` to `AllocIndex<?Sized>` needs to be made
+        // TODO: but `CoerceUnsized` is unstable
+
+        alloc.pop_unsized(index);
+    }
+
+    #[test]
+    fn test_boxed_unsized() {
+        let mut alloc = Allocator::new();
+        let boxed = Box::new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) as Box<[i32]>;
+        let index: AllocIndex<[i32]> = alloc.push_boxed(boxed);
+
+        assert_eq!(alloc.get(&index).iter().sum::<i32>(), 55);
+
         alloc.pop_unsized(index);
     }
 }
