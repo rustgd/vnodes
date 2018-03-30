@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 
+use util::{boxed_slice_from_raw, slice_from_raw};
 use {Error, Interned, InternedPath, InternedPathBuf, NodeHandle, NodeHandleRef, Result, Vnodes};
 
 #[repr(u8)]
@@ -8,7 +9,7 @@ pub enum Action {
     Call = 0x0,
     List = 0x1,
     Get = 0x10,
-    Set = 0x12,
+    Set = 0x11,
     Clone = 0x20,
     Drop = 0x21,
 }
@@ -44,6 +45,8 @@ bitflags! {
         const INTERNED_PATH_BUF = Self::_INTERNED.bits | Self::_ARRAY.bits | Self::_BOXED.bits;
         const NODE = Self::_NODE.bits;
         const NODE_BOXED = Self::_NODE.bits | Self::_BOXED.bits;
+        const STRING = Self::_STRING.bits;
+        const STRING_BOXED = Self::_STRING.bits | Self::_BOXED.bits;
         const VALUE_ARRAY = Self::_ARRAY.bits;
         const VALUE_ARRAY_BOXED = Self::_ARRAY.bits | Self::_BOXED.bits;
         const VOID = 0x0;
@@ -93,6 +96,7 @@ pub union RawValueInner {
     pub interned_path: *const Interned,
     pub node_data: *mut RawNodeData,
     pub signed: i64,
+    pub string: *const u8,
     pub unsigned: u64,
     pub value_array: *const RawValue,
 }
@@ -111,6 +115,8 @@ pub enum Value<'a> {
     Node(NodeHandle),
     NodeRef(NodeHandleRef<'a>),
     Signed(i64),
+    String(Box<[u8]>),
+    StringRef(&'a [u8]),
     Unsigned(u64),
     ValueArray(Box<[RawValue]>),
     ValueArrayRef(&'a [RawValue]),
@@ -122,8 +128,6 @@ impl<'a> Value<'a> {
     where
         'a: 'b,
     {
-        use std::slice::from_raw_parts;
-
         match raw.flags {
             Flags::BOOL => Value::Bool(raw.value.boolean),
             Flags::ERROR => Value::Error(raw.value.error),
@@ -132,23 +136,20 @@ impl<'a> Value<'a> {
             Flags::INTEGER_SIGNED => Value::Signed(raw.value.signed),
             Flags::INTERNED => Value::Interned(raw.value.interned),
             Flags::INTERNED_PATH => {
-                Value::InternedPathRef(from_raw_parts(raw.value.interned_path, raw.extra as usize))
+                Value::InternedPathRef(slice_from_raw(raw.value.interned_path, raw.extra))
             }
-            Flags::INTERNED_PATH_BUF => {
-                let slice = from_raw_parts(raw.value.interned_path, raw.extra as usize);
-                let boxed = Box::from_raw(slice as *const [Interned] as *mut [Interned]);
-
-                Value::InternedPathBuf(InternedPathBuf::from(boxed))
-            }
+            Flags::INTERNED_PATH_BUF => Value::InternedPathBuf(InternedPathBuf::from(
+                boxed_slice_from_raw(raw.value.interned_path, raw.extra),
+            )),
             Flags::NODE => Value::NodeRef(NodeHandleRef::from_raw(raw.value.node_data)),
             Flags::NODE_BOXED => Value::Node(NodeHandle::from_raw(raw.value.node_data)),
+            Flags::STRING => Value::StringRef(slice_from_raw(raw.value.string, raw.extra)),
+            Flags::STRING_BOXED => Value::String(boxed_slice_from_raw(raw.value.string, raw.extra)),
             Flags::VALUE_ARRAY => {
-                Value::ValueArrayRef(from_raw_parts(raw.value.value_array, raw.extra as usize))
+                Value::ValueArrayRef(slice_from_raw(raw.value.value_array, raw.extra))
             }
             Flags::VALUE_ARRAY_BOXED => {
-                let slice = from_raw_parts(raw.value.value_array, raw.extra as usize);
-
-                Value::ValueArray(Box::from_raw(slice as *const [RawValue] as *mut [RawValue]))
+                Value::ValueArray(boxed_slice_from_raw(raw.value.value_array, raw.extra))
             }
             Flags::VOID => Value::Void,
             flags => unimplemented!("Unimplemented flags: {:?}", flags),
@@ -188,6 +189,8 @@ impl<'a> Value<'a> {
             Value::Node(n) => Value::Node(n),
             Value::NodeRef(n) => Value::Node(n.to_handle()),
             Value::Signed(s) => Value::Signed(s),
+            Value::String(s) => Value::String(s),
+            Value::StringRef(s) => Value::String(Vec::from(s).into_boxed_slice()),
             Value::Unsigned(u) => Value::Unsigned(u),
             Value::ValueArray(a) => Value::ValueArray(a),
             Value::ValueArrayRef(a) => Value::ValueArray(Vec::from(a).into_boxed_slice()),
@@ -261,6 +264,18 @@ impl<'a> From<Value<'a>> for RawValue {
                 flags: Flags::INTEGER_SIGNED,
                 extra: 0,
                 value: RawValueInner { signed },
+            },
+            Value::String(s) => RawValue {
+                flags: Flags::STRING_BOXED,
+                extra: s.len() as u32,
+                value: RawValueInner {
+                    string: Box::into_raw(s) as *const u8,
+                },
+            },
+            Value::StringRef(s) => RawValue {
+                flags: Flags::STRING,
+                extra: s.len() as u32,
+                value: RawValueInner { string: s.as_ptr() },
             },
             Value::Unsigned(unsigned) => RawValue {
                 flags: Flags::INTEGER,

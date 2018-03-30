@@ -23,12 +23,61 @@ impl<'a> ValueConv<'a> for () {
 
 impl<'a> ValueConv<'a> for Value<'a> {
     fn from_value(value: Value<'a>) -> Result<Self> {
-        // Check if it's a value
-        Ok(value)
+        value.into_res()
     }
 
     fn into_value(self) -> Value<'a> {
         self
+    }
+}
+
+impl<'a> ValueConv<'a> for String {
+    fn from_value(value: Value) -> Result<Self> {
+        ValueConv::from_value(value)
+            .and_then(|s: Box<[u8]>| String::from_utf8(Vec::from(s)).map_err(|_| Error::Utf8Error))
+    }
+
+    fn into_value(self) -> Value<'a> {
+        Value::String(self.into_bytes().into_boxed_slice())
+    }
+}
+
+impl<'a> ValueConv<'a> for &'a str {
+    fn from_value(value: Value<'a>) -> Result<Self> {
+        use std::str::from_utf8;
+
+        ValueConv::from_value(value).and_then(|s| from_utf8(s).map_err(|_| Error::Utf8Error))
+    }
+
+    fn into_value(self) -> Value<'a> {
+        Value::StringRef(self.as_bytes())
+    }
+}
+
+impl<'a> ValueConv<'a> for Box<[u8]> {
+    fn from_value(value: Value) -> Result<Self> {
+        match value {
+            Value::String(s) => Ok(s),
+            Value::StringRef(s) => Ok(s.to_vec().into_boxed_slice()),
+            _ => Err(Error::WrongType),
+        }
+    }
+
+    fn into_value(self) -> Value<'a> {
+        Value::String(self)
+    }
+}
+
+impl<'a> ValueConv<'a> for &'a [u8] {
+    fn from_value(value: Value<'a>) -> Result<Self> {
+        match value {
+            Value::StringRef(s) => Ok(s),
+            _ => Err(Error::WrongType),
+        }
+    }
+
+    fn into_value(self) -> Value<'a> {
+        Value::StringRef(self)
     }
 }
 
@@ -135,6 +184,14 @@ mod tests {
         check_equal(true);
         check_equal(false);
         check_equal(Interned::from("my_ident"));
+    }
+
+    #[test]
+    fn check_strings() {
+        check_equal("Hello!");
+        check_equal(b"Byte slices are allowed, too (even better)" as &[u8]);
+        check_equal("Bye!".to_owned());
+        check_equal(Box::new(*b"(PS: Boxed slices also work ofc)") as Box<[u8]>);
     }
 
     #[test]

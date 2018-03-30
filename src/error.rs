@@ -14,8 +14,10 @@ pub enum Error {
     PathEmpty = 0x5,
     #[fail(display = "Unknown type")]
     UnknownTypeFlags = 0x6,
+    #[fail(display = "Unknown type")]
+    Utf8Error = 0x7,
     #[fail(display = "Wrong type")]
-    WrongType = 0x7, // TODO: `ExpectedNode` and `WrongType` intersect
+    WrongType = 0x8, // TODO: `ExpectedNode` and `WrongType` intersect
 }
 
 pub type Result<T> = ::std::result::Result<T, Error>;

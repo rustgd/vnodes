@@ -30,6 +30,7 @@ mod error;
 mod intern;
 mod map;
 mod node;
+mod util;
 
 pub struct Vnodes {
     allocator: Allocator,
