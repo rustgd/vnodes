@@ -11,7 +11,7 @@ extern crate fxhash;
 extern crate log;
 extern crate parking_lot;
 
-pub use alloc::Allocator;
+pub use alloc::RawAllocator;
 pub use conv::ValueConv;
 pub use data::Value;
 pub use error::{Error, Result};
@@ -34,7 +34,7 @@ mod node;
 mod util;
 
 pub struct Vnodes {
-    allocator: Allocator,
+    allocator: RawAllocator,
     current: NodeHandle,
     root: NodeHandle,
 }
@@ -44,7 +44,7 @@ impl Vnodes {
         let node = MapNode::new_node();
 
         Vnodes {
-            allocator: Allocator::new(),
+            allocator: RawAllocator::new(),
             current: node.clone(),
             root: node,
         }

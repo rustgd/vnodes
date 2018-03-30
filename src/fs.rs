@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::path::PathBuf;
 
 use {Interned, Node, NodeHandle, Result, Value, Vnodes};
