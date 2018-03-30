@@ -110,12 +110,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use MapNode;
     use std::fmt::Debug;
 
     /// Convert `T` -> `Value` -> `RawValue` -> `Value` -> `T` and check for equality.
-    fn check_equal<T>(start: T)
+    fn check_equal<'a, T>(start: T)
     where
-        T: Clone + Debug + PartialEq + for<'a> ValueConv<'a>,
+        T: Clone + Debug + PartialEq + ValueConv<'a> + 'a,
     {
         let value = start.clone().into_value();
         let raw: RawValue = value.into();
@@ -151,5 +152,12 @@ mod tests {
     fn check_paths() {
         check_equal(Interned::from("simple"));
         check_equal(InternedPathBuf::from("simple/path/to/hell"));
+    }
+
+    #[test]
+    fn check_nodes() {
+        check_equal(MapNode::new_node());
+        let node = MapNode::new_node();
+        check_equal(node.handle_ref());
     }
 }

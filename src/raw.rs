@@ -1,4 +1,5 @@
 #![no_mangle]
+#![allow(unused_variables)]
 
 pub use data::{Action, Flags, RawNodeData, RawValue, RawValueInner};
 pub use {Interned, Vnodes};

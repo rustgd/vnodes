@@ -167,7 +167,7 @@ impl NodeHandle {
         let boxed = NodeData::new(node);
 
         trace!(
-            "Node data with node {:x} created",
+            "node data with node {:x} created",
             boxed.as_ref() as *const _ as usize
         );
 
