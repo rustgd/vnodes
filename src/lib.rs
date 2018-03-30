@@ -27,6 +27,7 @@ mod alloc;
 mod conv;
 mod data;
 mod error;
+mod fs;
 mod intern;
 mod map;
 mod node;
