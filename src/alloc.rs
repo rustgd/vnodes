@@ -1,6 +1,8 @@
+use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::mem::{forget, size_of, size_of_val};
 use std::ptr;
+
 use util::{drop_maybe_sized, into_maybe_fat, into_maybe_fat_mut};
 
 const ALIGN: usize = 0x1 << ALIGN_LOG;
@@ -10,7 +12,9 @@ const MAX_BYTES_PER_ALLOC: usize = MAX_CELLS_PER_ALLOC << ALIGN_LOG;
 const MAX_CELLS_PER_ALLOC: usize = 0x1 << 8;
 const NUM_CELLS: usize = CAP << ALIGN_LOG;
 
-pub struct Allocator {
+thread_local!(static ALLOC: RefCell<Allocator> = RefCell::new(Allocator::new()));
+
+struct Allocator {
     pub raw: RawAllocator,
 }
 
@@ -21,9 +25,8 @@ impl Allocator {
         }
     }
 
-    pub fn get<'a, 'b, T>(&'a self, index: &'b AllocIndex<T>) -> &'b T
+    pub fn get<'a, T>(&self, index: &'a AllocIndex<T>) -> &'a T
     where
-        'a: 'b,
         T: Data + ?Sized,
     {
         unsafe {
@@ -34,9 +37,8 @@ impl Allocator {
         }
     }
 
-    pub fn get_mut<'a, 'b, T>(&'a mut self, index: &'b mut AllocIndex<T>) -> &'b mut T
+    pub fn get_mut<'a, T>(&mut self, index: &'a mut AllocIndex<T>) -> &'a mut T
     where
-        'a: 'b,
         T: Data + ?Sized,
     {
         unsafe {
@@ -120,16 +122,19 @@ impl Allocator {
 }
 
 #[derive(Debug)]
-#[must_use]
-pub struct AllocIndex<T: ?Sized> {
+pub struct AllocIndex<T: Data + ?Sized> {
     index: u32,
     size: u32,
-    marker: PhantomData<T>,
+    marker: PhantomData<*const T>, // not thread-safe
 }
 
-impl<T: ?Sized> Drop for AllocIndex<T> {
+impl<T: Data + ?Sized> Drop for AllocIndex<T> {
     fn drop(&mut self) {
-        error!("Memory leak: `AllocIndex` dropped, value was not popped")
+        pop_unsized(AllocIndex {
+            index: self.index,
+            size: self.size,
+            marker: self.marker,
+        });
     }
 }
 
@@ -149,7 +154,7 @@ unsafe impl<T> Data for [T] {
     }
 }
 
-pub struct RawAllocator {
+struct RawAllocator {
     buffer: Box<[[u8; ALIGN]]>,
     prev_size: Vec<usize>,
     cursor: usize,
@@ -165,6 +170,8 @@ impl RawAllocator {
     }
 
     pub fn allocate(&mut self, bytes: usize) -> usize {
+        assert!(bytes > 0);
+
         let cells = aligned_cells(bytes);
         let start = self.cursor;
         let end = start + cells;
@@ -216,6 +223,32 @@ impl RawAllocator {
             self.cursor
         );
     }
+}
+
+pub fn get<'a, T>(index: &'a AllocIndex<T>) -> &'a T
+where
+    T: Data + ?Sized,
+{
+    ALLOC.with(move |alloc| alloc.borrow().get(index))
+}
+
+pub fn get_mut<'a, T>(index: &'a mut AllocIndex<T>) -> &'a mut T
+where
+    T: Data + ?Sized,
+{
+    ALLOC.with(move |alloc| alloc.borrow_mut().get_mut(index))
+}
+
+pub fn push<T>(value: T) -> AllocIndex<T> {
+    ALLOC.with(|alloc| alloc.borrow_mut().push(value))
+}
+
+pub fn pop<T>(index: AllocIndex<T>) -> T {
+    ALLOC.with(|alloc| alloc.borrow_mut().pop(index))
+}
+
+pub fn pop_unsized<T: Data + ?Sized>(index: AllocIndex<T>) {
+    ALLOC.with(|alloc| alloc.borrow_mut().pop_unsized(index));
 }
 
 fn aligned_cells(bytes: usize) -> usize {
