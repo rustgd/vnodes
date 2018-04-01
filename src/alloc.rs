@@ -242,6 +242,10 @@ pub fn push<T>(value: T) -> AllocIndex<T> {
     ALLOC.with(|alloc| alloc.borrow_mut().push(value))
 }
 
+pub unsafe fn push_unsized<T, U: Data + ?Sized>(data: *const T, count: usize) -> AllocIndex<U> {
+    ALLOC.with(|alloc| alloc.borrow_mut().push_unsized(data, count))
+}
+
 pub fn pop<T>(index: AllocIndex<T>) -> T {
     ALLOC.with(|alloc| alloc.borrow_mut().pop(index))
 }
@@ -285,54 +289,52 @@ mod tests {
 
     #[test]
     fn test_push() {
-        let mut alloc = Allocator::new();
-        let mut index: AllocIndex<(i32, i32, i32)> = alloc.push((5, 1, 3));
+        let mut index: AllocIndex<(i32, i32, i32)> = push((5, 1, 3));
 
-        assert_eq!(alloc.get(&index), &(5, 1, 3));
+        assert_eq!(get(&index), &(5, 1, 3));
 
-        alloc.get_mut(&mut index).1 = 13;
+        get_mut(&mut index).1 = 13;
 
-        assert_eq!(alloc.get(&index), &(5, 13, 3));
+        assert_eq!(get(&index), &(5, 13, 3));
 
-        alloc.pop(index);
+        pop(index);
     }
 
     #[test]
     fn test_wrong_pop() {
-        let mut alloc = Allocator::new();
-        let mut index: AllocIndex<(i32, i32, i32)> = alloc.push((5, 1, 3));
+        let mut index: AllocIndex<(i32, i32, i32)> = push((5, 1, 3));
 
-        assert_eq!(alloc.get(&index), &(5, 1, 3));
+        assert_eq!(get(&index), &(5, 1, 3));
 
-        alloc.get_mut(&mut index).1 = 13;
+        get_mut(&mut index).1 = 13;
 
-        assert_eq!(alloc.get(&index), &(5, 13, 3));
+        assert_eq!(get(&index), &(5, 13, 3));
 
         // This should still work
-        alloc.pop_unsized(index);
+        pop_unsized(index);
     }
 
     #[test]
     fn test_coerce_unsized() {
-        let mut alloc = Allocator::new();
-        let index: AllocIndex<[i32; 10]> = alloc.push([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+        let index: AllocIndex<[i32; 10]> = push([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
         //let mut index = index as AllocIndex<[i32]>;
 
         // TODO: this does not work with current stable Rust
         // TODO: a conversion from `AllocIndex<Sized>` to `AllocIndex<?Sized>` needs to be made
         // TODO: but `CoerceUnsized` is unstable
 
-        alloc.pop_unsized(index);
+        pop_unsized(index);
     }
 
     #[test]
     fn test_boxed_unsized() {
-        let mut alloc = Allocator::new();
-        let boxed = Box::new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) as Box<[i32]>;
-        let index: AllocIndex<[i32]> = alloc.push_boxed(boxed);
+        let slice: AllocIndex<[i32]> = unsafe {
+            let array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+            push_unsized(&array as *const i32, array.len())
+        };
 
-        assert_eq!(alloc.get(&index).iter().sum::<i32>(), 55);
+        assert_eq!(get(&slice).iter().sum::<i32>(), 55);
 
-        alloc.pop_unsized(index);
+        pop_unsized(slice);
     }
 }
