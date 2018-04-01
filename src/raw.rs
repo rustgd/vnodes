@@ -12,7 +12,6 @@ pub type RawValueList = *const RawValue;
 
 mod export {
     use super::*;
-    use Value;
 
     pub unsafe extern "C" fn vnodes_context_insert(
         context: RawContextPtr,

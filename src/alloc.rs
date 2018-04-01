@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::marker::PhantomData;
-use std::mem::{forget, size_of, size_of_val};
+use std::mem::{forget, size_of};
 use std::ptr;
 
 use util::{drop_maybe_sized, into_maybe_fat, into_maybe_fat_mut};
@@ -67,17 +67,16 @@ impl Allocator {
         }
     }
 
-    pub fn push_boxed<T: Data + ?Sized>(&mut self, value: Box<T>) -> AllocIndex<T> {
-        let size = size_of_val(value.as_ref() as &T);
+    /// count = number of `T`s
+    pub unsafe fn push_unsized<T, U: Data + ?Sized>(
+        &mut self,
+        data: *const T,
+        count: usize,
+    ) -> AllocIndex<U> {
+        let size = count * size_of::<T>();
         let index = self.raw.allocate(size);
 
-        unsafe {
-            ptr::copy_nonoverlapping(
-                Box::into_raw(value) as *const T as *const u8,
-                self.raw.ptr_mut(index) as *mut u8,
-                size as usize,
-            );
-        }
+        ptr::copy_nonoverlapping(data, self.raw.ptr_mut(index) as *mut T, count);
 
         let index = index as u32;
         let size = size as u32;

@@ -1,4 +1,4 @@
-use std::mem::{size_of, size_of_val, transmute};
+use std::mem::size_of;
 use std::ptr::drop_in_place;
 use std::slice::from_raw_parts;
 
