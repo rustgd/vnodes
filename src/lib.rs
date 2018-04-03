@@ -15,7 +15,7 @@ pub use conv::ValueConv;
 pub use data::Value;
 pub use error::{Error, Result};
 pub use intern::{Interned, InternedPath, InternedPathBuf};
-pub use map::MapNode;
+pub use map::{InternedMap, MapNode};
 pub use node::{Node, NodeData, NodeHandle, NodeHandleRef, NodeMut};
 
 mod macros;

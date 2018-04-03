@@ -16,6 +16,7 @@ impl<T> InternedMap<T> {
         Default::default()
     }
 
+    #[inline]
     pub fn get(&self, key: Interned) -> Option<&T> {
         search(key.0, &self.keys).map(|i| &self.values[i])
     }
@@ -87,39 +88,112 @@ impl NodeMut for MapNode {
     }
 }
 
-fn search_n(key: u64, elements: &[u64]) -> usize {
-    // Placeholders
-    elements.iter().position(|&x| x == key).unwrap_or(0)
+unsafe fn search_n(key: u64, elements: &[u64]) -> usize {
+    let len = elements.len();
+    let check = len - 1;
+    // 2^(exp-1) < len <= 2^exp
+    let exp = (0..).map(|s| check >> s).take_while(|&n| n > 0).count();
+    let half = 1 << (exp - 1);
+
+    let mut exp_counter = exp - 2;
+    let mut ret = 0;
+    ret += if key >= get(elements, half) { len - half } else { 0 };
+    loop {
+        let pow = 1 << exp_counter;
+        ret += if key >= get(elements, ret + pow) { pow } else { 0 };
+
+        if exp_counter == 0 {
+            break;
+        }
+        exp_counter -= 1;
+    }
+
+    ret
 }
 
-fn search32(key: u64, elements: &[u64]) -> usize {
-    // Placeholders
-    elements.iter().position(|&x| x == key).unwrap_or(0)
+unsafe fn search32(key: u64, elements: &[u64]) -> usize {
+    let len = elements.len();
+    let first = len - 16;
+
+    let mut ret = if key >= get(elements, 16) { first } else { 0 };
+    ret += if key >= get(elements, ret + 8) { 8 } else { 0 };
+    ret += if key >= get(elements, ret + 4) { 4 } else { 0 };
+    ret += if key >= get(elements, ret + 2) { 2 } else { 0 };
+    ret += if key >= get(elements, ret + 1) { 1 } else { 0 };
+
+    ret
 }
 
-fn search16(key: u64, elements: &[u64]) -> usize {
-    // Placeholders
-    elements.iter().position(|&x| x == key).unwrap_or(0)
+unsafe fn search16(key: u64, elements: &[u64]) -> usize {
+    let len = elements.len();
+    let first = len - 8;
+
+    let mut ret = if key >= get(elements, 8) { first } else { 0 };
+    ret += if key >= get(elements, ret + 4) { 4 } else { 0 };
+    ret += if key >= get(elements, ret + 2) { 2 } else { 0 };
+    ret += if key >= get(elements, ret + 1) { 1 } else { 0 };
+
+    ret
 }
 
-fn search8(key: u64, elements: &[u64]) -> usize {
-    // Placeholders
-    elements.iter().position(|&x| x == key).unwrap_or(0)
+unsafe fn search8(key: u64, elements: &[u64]) -> usize {
+    let len = elements.len();
+    let first = len - 4;
+
+    let mut ret = if key >= get(elements, 4) { first } else { 0 };
+    ret += if key >= get(elements, ret + 2) { 2 } else { 0 };
+    ret += if key >= get(elements, ret + 1) { 1 } else { 0 };
+
+    ret
 }
 
 fn search(key: u64, elements: &[u64]) -> Option<usize> {
     let len = elements.len();
-    let index = (len << 3) - 1;
+    let index = len << 3;
 
-    let guess = match index {
-        0 => search8(key, elements),
-        1 => search16(key, elements),
-        2 => search32(key, elements),
-        _ => search_n(key, elements),
+    let guess = unsafe {
+        match index {
+            0 => elements.iter().position(|&e| e == key).unwrap_or(0),
+            1 => search8(key, elements),
+            2 => search16(key, elements),
+            3 => search32(key, elements),
+            _ => search_n(key, elements),
+        }
     };
 
     match guess {
         guess if elements[guess] == key => Some(guess),
         _ => None,
+    }
+}
+
+#[inline(always)]
+unsafe fn get(elements: &[u64], i: usize) -> u64 {
+    *elements.get_unchecked(i)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn check_insert_get() {
+        const KEYS: &[&str] = &[
+            "abc", "whatever", "hello", "okay", "makes", "sense", "w1th", "numb3rs", "s0m3", "m0r3"
+        ];
+
+        let mut cmp: HashMap<_, _> = HashMap::default();
+        let mut map = InternedMap::new();
+
+        for (i, &key) in KEYS.iter().enumerate() {
+            let interned = Interned::from(key);
+            map.insert(interned, i);
+            cmp.insert(interned, i);
+        }
+
+        for (key, value) in cmp {
+            assert_eq!(map.get(key), Some(&value));
+        }
     }
 }
