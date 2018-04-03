@@ -161,7 +161,7 @@ fn search(key: u64, elements: &[u64]) -> Option<usize> {
     };
 
     match guess {
-        guess if elements[guess] == key => Some(guess),
+        guess if elements.get(guess) == Some(&key) => Some(guess),
         _ => None,
     }
 }
@@ -175,6 +175,36 @@ unsafe fn get(elements: &[u64], i: usize) -> u64 {
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn check_zero_elements() {
+        let map = InternedMap::<()>::new();
+
+        assert_eq!(map.get(Interned::from("moo")), None);
+    }
+
+    #[test]
+    fn check_not_contained() {
+        const KEYS: &[&str] = &[
+            "abc", "whatever", "hello", "okay", "makes", "sense", "w1th", "numb3rs", "s0m3", "m0r3"
+        ];
+
+        let mut map = InternedMap::new();
+
+        for (i, &key) in KEYS.iter().enumerate() {
+            let interned = Interned::from(key);
+            map.insert(interned, i);
+        }
+
+        assert_eq!(map.get(Interned::from("these")), None);
+        assert_eq!(map.get(Interned::from("keys")), None);
+        assert_eq!(map.get(Interned::from("simply")), None);
+        assert_eq!(map.get(Interned::from("do")), None);
+        assert_eq!(map.get(Interned::from("not")), None);
+        assert_eq!(map.get(Interned::from("exist")), None);
+        assert_eq!(map.get(Interned::from("in")), None);
+        assert_eq!(map.get(Interned::from("here")), None);
+    }
 
     #[test]
     fn check_insert_get() {

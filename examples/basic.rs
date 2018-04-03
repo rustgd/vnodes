@@ -11,6 +11,7 @@ fn run() -> Result<()> {
     nodes.insert("/bar", MapNode::new_node())?;
     nodes.insert("bar/abc", 1u64)?;
     nodes.insert("/bar/5", 55u64)?;
+    nodes.insert("/bar/node/hello", MapNode::new_node())?;
 
     assert_eq!(nodes.get("/foo"), Ok(-5i64));
 
