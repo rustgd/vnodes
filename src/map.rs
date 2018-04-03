@@ -149,7 +149,7 @@ unsafe fn search8(key: u64, elements: &[u64]) -> usize {
 
 fn search(key: u64, elements: &[u64]) -> Option<usize> {
     let len = elements.len();
-    let index = len << 3;
+    let index = len >> 3;
 
     let guess = unsafe {
         match index {

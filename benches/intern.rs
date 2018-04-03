@@ -13,9 +13,12 @@ const KEYS: &[&str] = &[
 ];
 
 fn all_keys() -> Vec<String> {
-    KEYS.iter()
-        .flat_map(|&key| (0..50).map(move |nr| format!("{}{}", key, nr)))
-        .collect()
+    let mut v: Vec<_> = KEYS.iter()
+        .flat_map(|&key| (0..3).map(move |nr| format!("{}{}", key, nr)))
+        .collect();
+    v.push("hello".to_owned());
+
+    v
 }
 
 #[bench]
