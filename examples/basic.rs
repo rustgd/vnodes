@@ -2,12 +2,10 @@ extern crate fern;
 extern crate log;
 extern crate vnodes;
 
-use vnodes::{push, MapNode, Result, Vnodes};
+use vnodes::{MapNode, Result, Vnodes};
 
 fn run() -> Result<()> {
     let nodes = Vnodes::new();
-
-    push(5i32);
 
     nodes.insert("/foo", -5i64)?;
     nodes.insert("/bar", MapNode::new_node())?;

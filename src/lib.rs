@@ -11,7 +11,6 @@ extern crate fxhash;
 extern crate log;
 extern crate parking_lot;
 
-pub use alloc::{get, get_mut, pop, pop_unsized, push};
 pub use conv::ValueConv;
 pub use data::Value;
 pub use error::{Error, Result};
@@ -23,7 +22,6 @@ mod macros;
 
 pub mod raw;
 
-mod alloc;
 mod conv;
 mod data;
 mod error;
