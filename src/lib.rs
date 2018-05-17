@@ -29,6 +29,7 @@ mod fs;
 mod intern;
 mod map;
 mod node;
+mod stack;
 mod util;
 
 pub struct Vnodes {
