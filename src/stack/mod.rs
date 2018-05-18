@@ -88,6 +88,12 @@ impl Stack {
     }
 }
 
+impl Drop for Stack {
+    fn drop(&mut self) {
+        // TODO: drop remaining elements
+    }
+}
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Ty {
@@ -101,8 +107,7 @@ pub enum Ty {
     /// reverse: tuple tag, len (> 0), (types)*, (element)*
     Tuple = 0x7,
     Uint = 0x8,
-    Vector = 0x9,
-    Void = 0xA,
+    Void = 0x9,
 }
 
 impl Display for Ty {
@@ -124,6 +129,18 @@ impl Ty {
             0x8 => Some(Ty::Uint),
             0x9 => Some(Ty::Void),
             _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ty_from_byte() {
+        for i in 0..=0x9 {
+            assert_eq!(i, Ty::try_from(i).unwrap() as u8);
         }
     }
 }

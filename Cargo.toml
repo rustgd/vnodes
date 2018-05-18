@@ -23,6 +23,7 @@ failure = "0.1.1"
 fxhash = "0.2.1"
 log = "0.4.1"
 parking_lot = "0.5.4"
+smallvec = "0.6.1"
 
 [dev-dependencies]
 fern = "0.5.5"

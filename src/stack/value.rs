@@ -1,4 +1,5 @@
 use stack::{Result, Stack, TupleMismatch, Ty};
+use intern::Interned;
 
 pub trait Push: Sized {
     fn push_tags(stack: &mut Stack);
@@ -111,6 +112,26 @@ impl Pop for i64 {
 
     fn pop_value(stack: &mut Stack) -> Self {
         stack.pop_u64() as i64
+    }
+}
+
+impl Push for Interned {
+    fn push_tags(stack: &mut Stack) {
+        stack.push_tag(Ty::Interned);
+    }
+
+    fn push_value(stack: &mut Stack, value: Self) {
+        stack.push_u64(value.0);
+    }
+}
+
+impl Pop for Interned {
+    fn tag() -> Ty {
+        Ty::Interned
+    }
+
+    fn pop_value(stack: &mut Stack) -> Self {
+        Interned(stack.pop_u64())
     }
 }
 
