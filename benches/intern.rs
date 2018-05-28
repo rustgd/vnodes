@@ -9,11 +9,12 @@ use test::{black_box, Bencher};
 use vnodes::{Interned, InternedMap};
 
 const KEYS: &[&str] = &[
-    "abc", "whatever", "hello", "okay", "makes", "sense", "w1th", "numb3rs", "s0m3", "m0r3"
+    "abc", "whatever", "hello", "okay", "makes", "sense", "w1th", "numb3rs", "s0m3", "m0r3",
 ];
 
 fn all_keys() -> Vec<String> {
-    let mut v: Vec<_> = KEYS.iter()
+    let mut v: Vec<_> = KEYS
+        .iter()
         .flat_map(|&key| (0..3).map(move |nr| format!("{}{}", key, nr)))
         .collect();
     v.push("hello".to_owned());
