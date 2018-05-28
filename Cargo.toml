@@ -1,6 +1,6 @@
 [package]
 name = "vnodes"
-version = "0.0.0"
+version = "0.1.0"
 authors = ["torkleyy <torkleyy@gmail.com>"]
 description = """
 [Experimental] Virtual node system. This is a work in progress.
@@ -17,10 +17,7 @@ exclude = ["bors.toml", ".travis.yml"]
 travis-ci = { repository = "rustgd/vnodes" }
 
 [dependencies]
-bitflags = "1"
-derivative = "1.0.0"
 failure = "0.1.1"
-fxhash = "0.2.1"
 log = "0.4.1"
 parking_lot = "0.5.4"
 smallvec = "0.6.1"
