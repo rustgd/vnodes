@@ -2,7 +2,7 @@ use std::mem::swap;
 
 use parking_lot::RwLock;
 
-use {Error, Interned, NodeHandle, NodeMut, Result, Value, Vnodes};
+use {Error, Interned, Node, Stack};
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
@@ -67,24 +67,34 @@ pub struct MapNode {
 }
 
 impl MapNode {
-    pub fn new_node() -> NodeHandle {
-        NodeHandle::new(RwLock::new(MapNode::default()))
+    pub fn new() -> Self {
+        MapNode::default()
     }
 }
 
-impl NodeMut for MapNode {
-    fn call(&self, _: &Vnodes, _: &[Value]) -> Result<Value<'static>> {
+impl Node for MapNode {
+    fn clone(&self, stack: &mut Stack) {
         unimplemented!()
     }
 
-    fn get(&self, _: &Vnodes, ident: Interned) -> Result<Value<'static>> {
-        self.map.get(ident).cloned().ok_or(Error::NoSuchEntry)
+    fn call(&self, stack: &mut Stack) {
+        unimplemented!()
     }
 
-    fn set(&mut self, _: &Vnodes, ident: Interned, value: Value<'static>) -> Result<()> {
-        self.map.insert(ident, value);
+    fn get(&self, stack: &mut Stack) {
+        unimplemented!()
+    }
 
-        Ok(())
+    fn create(&self, stack: &mut Stack) {
+        unimplemented!()
+    }
+
+    fn get_or_create(&self, stack: &mut Stack) {
+        unimplemented!()
+    }
+
+    fn set(&self, stack: &mut Stack) {
+        unimplemented!()
     }
 }
 
