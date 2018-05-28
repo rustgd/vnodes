@@ -1,26 +1,30 @@
 pub use self::error::{Error, Result, StackTooSmall, TupleMismatch, UnexpectedTy};
-pub use self::value::{Pop, Push};
+pub use self::push_pop::{Pop, Push};
 
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::mem::{transmute, uninitialized};
 
 mod error;
+mod push_pop;
 mod value;
 
 pub struct Stack {
+    cursor: Option<usize>,
     inner: Vec<u8>,
 }
 
 impl Stack {
     pub fn new() -> Self {
-        Stack { inner: vec![] }
+        Stack { cursor: None, inner: vec![] }
     }
 
-    pub fn push<V>(&mut self, value: V)
+    pub fn push<V>(&mut self, value: V) -> StackId
     where
         V: Push,
     {
         V::push(self, value);
+
+        StackId(self.inner.len())
     }
 
     fn push_tag(&mut self, tag: Ty) {
@@ -94,20 +98,35 @@ impl Drop for Stack {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
+pub struct StackId(usize);
+
+impl StackId {
+    pub fn into_inner(self) -> usize {
+        self.0
+    }
+}
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Ty {
     /// reverse: tag, element type, len, (element)*
     Array = 0x1,
     Bool = 0x2,
-    Float = 0x3,
-    Int = 0x4,
-    Interned = 0x5,
-    String = 0x6,
+    /// Custom type that can't be interpreted by scripts, only passed around
+    Custom = 0x3,
+    Float = 0x4,
+    Int = 0x5,
+    Interned = 0x6,
+    Node = 0x7,
+    /// A plain `Copy` struct with a known C layout
+    Plain = 0x8,
+    String = 0x9,
     /// reverse: tuple tag, len (> 0), (types)*, (element)*
-    Tuple = 0x7,
-    Uint = 0x8,
-    Void = 0x9,
+    Tuple = 0xA,
+    Uint = 0xB,
+    Void = 0xC,
 }
 
 impl Display for Ty {
@@ -121,13 +140,16 @@ impl Ty {
         match byte {
             0x1 => Some(Ty::Array),
             0x2 => Some(Ty::Bool),
-            0x3 => Some(Ty::Float),
-            0x4 => Some(Ty::Int),
-            0x5 => Some(Ty::Interned),
-            0x6 => Some(Ty::String),
-            0x7 => Some(Ty::Tuple),
-            0x8 => Some(Ty::Uint),
-            0x9 => Some(Ty::Void),
+            0x3 => Some(Ty::Custom),
+            0x4 => Some(Ty::Float),
+            0x5 => Some(Ty::Int),
+            0x6 => Some(Ty::Interned),
+            0x7 => Some(Ty::Node),
+            0x8 => Some(Ty::Plain),
+            0x9 => Some(Ty::String),
+            0xA => Some(Ty::Tuple),
+            0xB => Some(Ty::Uint),
+            0xC => Some(Ty::Void),
             _ => None,
         }
     }
@@ -139,7 +161,7 @@ mod tests {
 
     #[test]
     fn ty_from_byte() {
-        for i in 0..=0x9 {
+        for i in 1..=0xC {
             assert_eq!(i, Ty::try_from(i).unwrap() as u8);
         }
     }
