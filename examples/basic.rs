@@ -1,4 +1,4 @@
-extern crate fern;
+/*extern crate fern;
 extern crate log;
 extern crate vnodes;
 
@@ -37,3 +37,5 @@ fn main() {
         eprintln!("Error: {}", e);
     }
 }
+*/
+fn main() {}
